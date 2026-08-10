@@ -11,9 +11,20 @@ Ingestion rejects truncated GitHub tree responses and snapshots exceeding config
 or known-byte limits. Provider failures are explicit; the API does not turn partial data into a
 successful analysis.
 
+## Implemented deterministic pipeline
+
+Composable analyzers now classify supported languages by extension and known bytes, excluding
+common generated/vendor directories. Separate analyzers identify important files and high-
+confidence technology markers such as framework configuration, package-manager locks, build
+tools, containers, and CI workflows. Every finding retains concrete file-path evidence.
+
+The API returns the original immutable snapshot beside the deterministic findings. Unknown
+repositories receive an honest generic project type rather than a guessed application category.
+
 ## Next pipeline milestone
 
-Composable deterministic analyzers will consume the snapshot to classify languages, important
-files, frameworks, dependency manifests, documentation, tests, CI, and runtime evidence.
+Ingest a strictly allowlisted, size-bounded set of textual manifests. Dependency, framework,
+documentation, test, CI, and runtime analyzers can then parse file contents without cloning or
+executing the repository.
 
 Pipeline: validation, provider retrieval, bounded ingestion, deterministic analyzers, explainable scoring, persistence, and presentation. Facts retain evidence and confidence.

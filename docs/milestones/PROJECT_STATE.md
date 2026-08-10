@@ -9,12 +9,15 @@ Last updated: 2026-08-10
 - FastAPI health and analysis routes, provider abstraction, and strict GitHub URL parsing.
 - Bounded GitHub API ingestion for public repository metadata and recursive file trees, with
   explicit not-found, rate-limit, truncation, file-count, and known-byte limit failures.
-- Verification: 13 backend tests, Python lint and strict typing, frontend lint and typing,
+- Composable deterministic pipeline for language distribution, important files, technology
+  markers, and evidence-backed project types.
+- Verification: 16 backend tests, Python lint and strict typing, frontend lint and typing,
   and the Next.js production build.
 
 ## Planned
 
-- Deterministic analyzers, persistence, shareable results, usage limits, authentication,
+- Bounded manifest-content ingestion and dependency/framework/runtime analyzers.
+- Real results UI, scoring, persistence, shareable results, usage limits, authentication,
   compatibility, and setup guidance.
 
 ## Known constraints
