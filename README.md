@@ -1,6 +1,6 @@
 # RepoLive
 
-RepoLive turns public source repositories into evidence-based, beginner-friendly technical reports. This clean rebuild currently contains the first verified product foundation; it does not execute repository code.
+RepoLive turns public source repositories into evidence-based, beginner-friendly technical reports. This clean rebuild currently validates GitHub URLs and ingests bounded public repository metadata and file trees through GitHub's API; it does not execute repository code.
 
 ## Local development
 
@@ -25,4 +25,3 @@ cmd /c npm run build:web
 ```
 
 See [PROJECT_STATE.md](docs/milestones/PROJECT_STATE.md) for exact implementation status and limitations.
-
