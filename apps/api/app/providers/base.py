@@ -18,6 +18,10 @@ class RepositoryNotFoundError(RepositoryProviderError):
 class RepositoryRateLimitError(RepositoryProviderError):
     """Raised when provider rate or access policy blocks retrieval."""
 
+    def __init__(self, message: str, retry_after_seconds: int | None = None) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
 
 class RepositoryTooLargeError(RepositoryProviderError):
     """Raised when configured ingestion limits are exceeded."""

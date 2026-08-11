@@ -1,3 +1,4 @@
+import re
 import secrets
 from typing import Annotated
 
@@ -11,6 +12,7 @@ from app.db.store import (
     AnalysisPersistenceError,
     AnalysisStore,
     AnonymousLimitExceeded,
+    AuthenticatedLimitExceeded,
     get_analysis_store,
 )
 from app.providers.base import (
@@ -27,6 +29,8 @@ from app.schemas.analysis import AnalysisHistoryItem, AnalysisReport
 from app.schemas.repository import AnalysisRequest
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
+_ANONYMOUS_ID = re.compile(r"^[A-Za-z0-9_-]{20,128}$")
+_PUBLIC_ID = re.compile(r"^[A-Za-z0-9_-]{8,32}$")
 
 
 def get_repository_provider() -> RepositoryProvider:
@@ -51,7 +55,8 @@ async def request_analysis(
     except RepositoryNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RepositoryRateLimitError as exc:
-        raise HTTPException(status_code=429, detail=str(exc)) from exc
+        headers = {"Retry-After": str(exc.retry_after_seconds)} if exc.retry_after_seconds else None
+        raise HTTPException(status_code=429, detail=str(exc), headers=headers) from exc
     except RepositoryTooLargeError as exc:
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except RepositoryConnectivityError as exc:
@@ -63,18 +68,29 @@ async def request_analysis(
         .analyze(snapshot)
         .model_copy(update={"analysis_version": get_settings().analysis_version})
     )
-    anonymous_id = request.cookies.get("repolive_anonymous_id") or secrets.token_urlsafe(24)
+    candidate_id = request.cookies.get("repolive_anonymous_id", "")
+    anonymous_id = (
+        candidate_id if _ANONYMOUS_ID.fullmatch(candidate_id) else secrets.token_urlsafe(24)
+    )
     try:
         stored_report = store.save(
             report,
             anonymous_id,
             get_settings().free_anonymous_analysis_limit,
             user.user_id if user else None,
+            get_settings().free_authenticated_analysis_limit,
         )
     except AnonymousLimitExceeded as exc:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Anonymous analysis allowance exhausted.",
+        ) from exc
+    except AuthenticatedLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Authenticated new-analysis allowance exhausted. Cached reports remain reusable."
+            ),
         ) from exc
     except AnalysisPersistenceError as exc:
         raise HTTPException(
@@ -106,6 +122,8 @@ def delete_analysis_history_item(
     user: Annotated[AuthUser, Depends(require_user)],
     store: Annotated[AnalysisStore, Depends(get_analysis_store)],
 ) -> Response:
+    if not _PUBLIC_ID.fullmatch(public_id):
+        raise HTTPException(status_code=404, detail="Saved analysis not found.")
     if not store.remove_for_user(user.user_id, public_id):
         raise HTTPException(status_code=404, detail="Saved analysis not found.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -117,6 +135,8 @@ def check_machine_compatibility(
     machine: MachineProfile,
     store: Annotated[AnalysisStore, Depends(get_analysis_store)],
 ) -> MachineCompatibilityResult:
+    if not _PUBLIC_ID.fullmatch(public_id):
+        raise HTTPException(status_code=404, detail="Analysis not found.")
     report = store.get(public_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Analysis not found.")
@@ -128,7 +148,7 @@ def get_analysis(
     public_id: str,
     store: Annotated[AnalysisStore, Depends(get_analysis_store)],
 ) -> AnalysisReport:
-    if len(public_id) > 32:
+    if not _PUBLIC_ID.fullmatch(public_id):
         raise HTTPException(status_code=404, detail="Analysis not found.")
     report = store.get(public_id)
     if report is None:

@@ -6,6 +6,7 @@ from app.db.store import (
     AnalysisPersistenceError,
     AnalysisStore,
     AnonymousLimitExceeded,
+    AuthenticatedLimitExceeded,
     analyses,
 )
 from app.schemas.analysis import AnalysisReport, DeterministicAnalysis, QualitySignals
@@ -98,6 +99,16 @@ def test_authenticated_analyses_do_not_consume_anonymous_allowance() -> None:
     assert anonymous.public_id is not None
     with pytest.raises(AnonymousLimitExceeded):
         store.save(empty_report(commit_sha="commit-4"), "shared-browser", 1)
+
+
+def test_authenticated_new_analysis_limit_and_free_cache_reuse() -> None:
+    store = AnalysisStore("sqlite:///:memory:")
+    first = store.save(empty_report(), "browser", 1, "user-a", 1)
+    cached = store.save(empty_report(), "browser", 1, "user-a", 1)
+    assert cached.public_id == first.public_id
+    assert cached.cache_status == "cached"
+    with pytest.raises(AuthenticatedLimitExceeded):
+        store.save(empty_report(commit_sha="commit-2"), "browser", 1, "user-a", 1)
 
 
 def test_failed_history_link_rolls_back_the_analysis_transaction(

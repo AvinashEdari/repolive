@@ -1,5 +1,6 @@
 import base64
 import re
+import time
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
@@ -79,7 +80,14 @@ class GitHubRepositoryProvider(RepositoryProvider):
         owner, name = parts
         if name.endswith(".git"):
             name = name[:-4]
-        if not owner or not name or not _SEGMENT.fullmatch(owner) or not _SEGMENT.fullmatch(name):
+        if (
+            owner in {".", ".."}
+            or name in {".", ".."}
+            or not owner
+            or not name
+            or not _SEGMENT.fullmatch(owner)
+            or not _SEGMENT.fullmatch(name)
+        ):
             raise InvalidRepositoryUrl("GitHub owner or repository name is invalid.")
 
         return RepositoryReference(
@@ -135,18 +143,30 @@ class GitHubRepositoryProvider(RepositoryProvider):
                     "Repository tree exceeds GitHub's safe recursive response limit."
                 )
 
-            files = [
-                RepositoryFile(
-                    path=item["path"],
-                    size_bytes=item.get("size"),
-                    content_id=item.get("sha"),
+            files = []
+            for item in tree_payload["tree"]:
+                if (
+                    not isinstance(item, dict)
+                    or item.get("type") != "blob"
+                    or item.get("mode") == "120000"
+                    or not isinstance(item.get("path"), str)
+                ):
+                    continue
+                path = item["path"]
+                if (
+                    len(path.encode("utf-8")) > self.settings.max_repository_path_bytes
+                    or any(ord(character) < 32 or ord(character) == 127 for character in path)
+                    or PurePosixPath(path).is_absolute()
+                    or ".." in PurePosixPath(path).parts
+                ):
+                    raise RepositoryProviderError("GitHub returned an unsafe repository path.")
+                files.append(
+                    RepositoryFile(
+                        path=path,
+                        size_bytes=item.get("size"),
+                        content_id=item.get("sha"),
+                    )
                 )
-                for item in tree_payload["tree"]
-                if isinstance(item, dict)
-                and item.get("type") == "blob"
-                and item.get("mode") != "120000"
-                and isinstance(item.get("path"), str)
-            ]
             if len(files) > self.settings.max_repository_files:
                 raise RepositoryTooLargeError("Repository exceeds the configured file limit.")
             known_bytes = sum(item.size_bytes or 0 for item in files)
@@ -188,9 +208,10 @@ class GitHubRepositoryProvider(RepositoryProvider):
     def _raise_for_status(response: httpx.Response) -> None:
         if response.status_code == 404:
             raise RepositoryNotFoundError("Repository was not found or is not public.")
-        if response.status_code == 403:
+        if response.status_code in {403, 429}:
+            retry_after = GitHubRepositoryProvider._retry_after(response)
             raise RepositoryRateLimitError(
-                "GitHub rate limit or access policy blocked the request."
+                "GitHub rate limit or access policy blocked the request.", retry_after
             )
         if response.is_error:
             raise RepositoryProviderError("GitHub returned an unexpected error.")
@@ -229,6 +250,9 @@ class GitHubRepositoryProvider(RepositoryProvider):
                 raise RepositoryProviderError("GitHub returned an invalid evidence file.")
             try:
                 encoded = "".join(payload["content"].split())
+                if len(encoded) > ((self.settings.max_evidence_file_bytes + 2) // 3) * 4:
+                    warnings.append(f"Oversized evidence was skipped: {file.path}")
+                    continue
                 raw = base64.b64decode(encoded, validate=True)
             except ValueError as exc:
                 raise RepositoryProviderError("GitHub returned invalid base64 evidence.") from exc
@@ -248,6 +272,16 @@ class GitHubRepositoryProvider(RepositoryProvider):
                 break
             file.text_content = text
         return warnings
+
+    @staticmethod
+    def _retry_after(response: httpx.Response) -> int | None:
+        retry_after = response.headers.get("retry-after")
+        if retry_after and retry_after.isdigit():
+            return min(max(int(retry_after), 1), 3600)
+        reset = response.headers.get("x-ratelimit-reset")
+        if reset and reset.isdigit():
+            return min(max(int(reset) - int(time.time()), 1), 3600)
+        return None
 
     def _is_evidence_file(self, file: RepositoryFile) -> bool:
         if file.size_bytes is not None and file.size_bytes > self.settings.max_evidence_file_bytes:

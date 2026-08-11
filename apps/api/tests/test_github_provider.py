@@ -4,7 +4,11 @@ import httpx
 import pytest
 
 from app.core.config import Settings
-from app.providers.base import InvalidRepositoryUrl, RepositoryProviderError
+from app.providers.base import (
+    InvalidRepositoryUrl,
+    RepositoryProviderError,
+    RepositoryRateLimitError,
+)
 from app.providers.github import GitHubRepositoryProvider
 
 provider = GitHubRepositoryProvider()
@@ -31,11 +35,41 @@ def test_parse_valid_url(url: str, owner: str, name: str) -> None:
         "https://user:secret@github.com/a/b",
         "https://github.com/a/b?tab=readme",
         "https://github.com/a/%2e%2e",
+        "https://github.com/../b",
+        "https://github.com/./b",
     ],
 )
 def test_rejects_unsafe_or_unsupported_url(url: str) -> None:
     with pytest.raises(InvalidRepositoryUrl):
         provider.parse_url(url)
+
+
+@pytest.mark.asyncio
+async def test_rejects_unsafe_repository_paths() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/commits/main"):
+            return httpx.Response(200, json={"sha": "commit"})
+        if request.url.path.endswith("/git/trees/main"):
+            return httpx.Response(
+                200,
+                json={"truncated": False, "tree": [{"path": "../package.json", "type": "blob"}]},
+            )
+        return httpx.Response(200, json={"default_branch": "main"})
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(respond), base_url="https://api.github.com"
+    ) as client:
+        with pytest.raises(RepositoryProviderError, match="unsafe repository path"):
+            await GitHubRepositoryProvider(Settings(), client).fetch_snapshot(
+                provider.parse_url("https://github.com/a/b")
+            )
+
+
+def test_rate_limit_retry_after_is_bounded() -> None:
+    response = httpx.Response(429, headers={"retry-after": "99999"})
+    with pytest.raises(RepositoryRateLimitError) as caught:
+        provider._raise_for_status(response)
+    assert caught.value.retry_after_seconds == 3600
 
 
 @pytest.mark.asyncio

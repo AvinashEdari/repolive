@@ -11,7 +11,13 @@ from app.api.routes.health import router as health_router
 from app.core.config import get_settings
 
 settings = get_settings()
-app = FastAPI(title="RepoLive API", version="0.1.0")
+app = FastAPI(
+    title="RepoLive API",
+    version="0.1.0",
+    docs_url=None if settings.app_env == "production" else "/docs",
+    redoc_url=None if settings.app_env == "production" else "/redoc",
+    openapi_url=None if settings.app_env == "production" else "/openapi.json",
+)
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=[host.strip() for host in settings.allowed_hosts.split(",") if host.strip()],
@@ -30,13 +36,24 @@ async def security_headers(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     content_length = request.headers.get("content-length")
-    if content_length and content_length.isdigit() and int(content_length) > 4096:
+    if (
+        content_length
+        and content_length.isdigit()
+        and int(content_length) > settings.max_request_body_bytes
+    ):
         return JSONResponse(status_code=413, content={"detail": "Request body is too large."})
+    if request.method in {"POST", "PUT", "PATCH"}:
+        body = await request.body()
+        if len(body) > settings.max_request_body_bytes:
+            return JSONResponse(status_code=413, content={"detail": "Request body is too large."})
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=()"
+    if settings.app_env == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.method != "GET" or request.url.path.endswith("/analyses"):
         response.headers["Cache-Control"] = "no-store"
     return response

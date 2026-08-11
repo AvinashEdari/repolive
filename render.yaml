@@ -40,10 +40,16 @@ services:
         value: "15"
       - key: FREE_ANONYMOUS_ANALYSIS_LIMIT
         value: "5"
+      - key: FREE_AUTHENTICATED_ANALYSIS_LIMIT
+        value: "50"
+      - key: MAX_REQUEST_BODY_BYTES
+        value: "4096"
       - key: MAX_REPOSITORY_FILES
         value: "10000"
       - key: MAX_REPOSITORY_BYTES
         value: "104857600"
+      - key: MAX_REPOSITORY_PATH_BYTES
+        value: "1024"
       - key: MAX_EVIDENCE_FILES
         value: "40"
       - key: MAX_EVIDENCE_FILE_BYTES

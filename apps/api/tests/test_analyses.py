@@ -24,9 +24,14 @@ class FakeAnalysisStore:
         self.reports: dict[str, object] = {}
 
     def save(
-        self, report: object, anonymous_id: str, limit: int, user_id: str | None = None
+        self,
+        report: object,
+        anonymous_id: str,
+        anonymous_limit: int,
+        user_id: str | None = None,
+        authenticated_limit: int = 50,
     ) -> object:
-        del anonymous_id, limit, user_id
+        del anonymous_id, anonymous_limit, user_id, authenticated_limit
         stored = report.model_copy(update={"public_id": "public-test-id"})
         self.reports["public-test-id"] = stored
         return stored
@@ -155,7 +160,39 @@ def test_oversized_request_body_is_rejected_before_validation() -> None:
     assert response.status_code == 413
 
 
+def test_oversized_request_body_without_content_length_is_rejected() -> None:
+    def body() -> object:
+        yield b"x" * 5000
+
+    response = client.post(
+        "/api/v1/analyses",
+        content=body(),
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 413
+
+
+def test_malformed_anonymous_cookie_is_rotated() -> None:
+    response = client.post(
+        "/api/v1/analyses",
+        json={"repository_url": "https://github.com/openai/openai-python"},
+        cookies={"repolive_anonymous_id": "x" * 500},
+    )
+    assert response.status_code == 200
+    assert response.cookies["repolive_anonymous_id"] != "x" * 500
+
+
+@pytest.mark.parametrize("public_id", ["../secret", "short", "x" * 33, "bad%2Fvalue"])
+def test_public_id_routes_reject_malformed_values(public_id: str) -> None:
+    assert client.get(f"/api/v1/analyses/{public_id}").status_code == 404
+    machine = {"operating_system": "Linux", "cpu_architecture": "x86_64"}
+    assert (
+        client.post(f"/api/v1/analyses/{public_id}/compatibility", json=machine).status_code == 404
+    )
+
+
 def test_security_and_cache_headers_are_present() -> None:
     response = client.get("/api/v1/health")
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["permissions-policy"] == "camera=(), geolocation=(), microphone=()"

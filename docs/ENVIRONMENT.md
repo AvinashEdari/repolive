@@ -17,7 +17,10 @@
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`: browser-safe Supabase Auth configuration. Never use a service-role key here.
 - `GITHUB_REQUEST_TIMEOUT_SECONDS`: timeout applied to each GitHub API request.
 - `FREE_ANONYMOUS_ANALYSIS_LIMIT`: successful new analyses allowed per anonymous cookie identity.
-- `MAX_REPOSITORY_FILES`, `MAX_REPOSITORY_BYTES`: repository snapshot limits.
+- `FREE_AUTHENTICATED_ANALYSIS_LIMIT`: successful new analyses allowed per verified user subject.
+- `MAX_REQUEST_BODY_BYTES`: maximum actual API request body size.
+- `MAX_REPOSITORY_FILES`, `MAX_REPOSITORY_BYTES`, `MAX_REPOSITORY_PATH_BYTES`: repository snapshot
+  limits.
 - `MAX_EVIDENCE_FILES`, `MAX_EVIDENCE_FILE_BYTES`, `MAX_EVIDENCE_TOTAL_BYTES`: allowlisted text limits.
 - `NEXT_PUBLIC_API_URL`: browser-visible API base URL; it must never contain credentials.
 

@@ -57,6 +57,12 @@ Last updated: 2026-08-11
   reuse, public sharing, machine compatibility, invalid-login handling, login, logout, authenticated
   persistence, private history, and cross-user history isolation.
 - Desktop and mobile viewport checks found no horizontal overflow on the analysis workspace.
+- Stage 5 hardening bounds actual request bodies, repository paths, and encoded evidence before
+  decoding; normalizes anonymous cookies and public IDs; disables production API documentation;
+  adds provider retry guidance, HSTS, and permissions policy headers; and applies atomic anonymous
+  and authenticated new-analysis allowances while keeping cached results reusable.
+- Security reporting, privacy/retention boundaries, and a production hardening checklist are
+  documented. Security regression coverage is included in the 89-test backend suite.
 
 ## Planned
 

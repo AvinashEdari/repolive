@@ -22,6 +22,7 @@ def test_migrations_upgrade_and_downgrade_schema(tmp_path: Path) -> None:
             "analyses",
             "analysis_user_links",
             "anonymous_usage",
+            "authenticated_usage",
         }
         analysis_pk = inspector.get_pk_constraint("analyses")
         assert analysis_pk["constrained_columns"] == ["public_id"]
@@ -55,3 +56,4 @@ def test_migrations_render_for_postgresql_without_a_live_connection() -> None:
     assert "CREATE TABLE analyses" in rendered
     assert "uq_analysis_identity_version" in rendered
     assert "CREATE TABLE analysis_user_links" in rendered
+    assert "CREATE TABLE authenticated_usage" in rendered

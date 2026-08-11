@@ -54,6 +54,13 @@ anonymous_usage = Table(
     Column("analysis_count", Integer, nullable=False, default=0),
     Column("updated_at", DateTime(timezone=True), nullable=False),
 )
+authenticated_usage = Table(
+    "authenticated_usage",
+    metadata,
+    Column("user_id", String(128), primary_key=True),
+    Column("analysis_count", Integer, nullable=False, default=0),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
 analysis_user_links = Table(
     "analysis_user_links",
     metadata,
@@ -70,6 +77,10 @@ analysis_user_links = Table(
 
 class AnonymousLimitExceeded(RuntimeError):
     """Raised when an anonymous browser exhausts its configured allowance."""
+
+
+class AuthenticatedLimitExceeded(RuntimeError):
+    """Raised when an account exhausts its configured new-analysis allowance."""
 
 
 class AnalysisPersistenceError(RuntimeError):
@@ -111,7 +122,12 @@ class AnalysisStore:
             metadata.create_all(self.engine)
 
     def save(
-        self, report: AnalysisReport, anonymous_id: str, limit: int, user_id: str | None = None
+        self,
+        report: AnalysisReport,
+        anonymous_id: str,
+        anonymous_limit: int,
+        user_id: str | None = None,
+        authenticated_limit: int = 50,
     ) -> AnalysisReport:
         now = datetime.now(UTC)
         identity = self._identity(report)
@@ -132,25 +148,24 @@ class AnalysisStore:
                         self._link_user(connection, user_id, cached.public_id, now)
                     return cached.model_copy(update={"cache_status": "cached"})
                 if user_id is None:
-                    usage = connection.execute(
-                        select(anonymous_usage.c.analysis_count).where(
-                            anonymous_usage.c.anonymous_id == anonymous_id
-                        )
-                    ).scalar_one_or_none()
-                    if usage is not None and usage >= limit:
+                    if not self._consume_allowance(
+                        connection,
+                        anonymous_usage,
+                        "anonymous_id",
+                        anonymous_id,
+                        anonymous_limit,
+                        now,
+                    ):
                         raise AnonymousLimitExceeded
-                    if usage is None:
-                        connection.execute(
-                            anonymous_usage.insert().values(
-                                anonymous_id=anonymous_id, analysis_count=1, updated_at=now
-                            )
-                        )
-                    else:
-                        connection.execute(
-                            anonymous_usage.update()
-                            .where(anonymous_usage.c.anonymous_id == anonymous_id)
-                            .values(analysis_count=usage + 1, updated_at=now)
-                        )
+                elif not self._consume_allowance(
+                    connection,
+                    authenticated_usage,
+                    "user_id",
+                    user_id,
+                    authenticated_limit,
+                    now,
+                ):
+                    raise AuthenticatedLimitExceeded
                 public_id = secrets.token_urlsafe(12)
                 stored_report = report.model_copy(update={"public_id": public_id})
                 serialized = stored_report.model_dump_json()
@@ -168,6 +183,52 @@ class AnalysisStore:
         except SQLAlchemyError as exc:
             raise AnalysisPersistenceError("Analysis persistence failed.") from exc
         return stored_report
+
+    @staticmethod
+    def _consume_allowance(
+        connection: Connection,
+        table: Table,
+        identifier_column: str,
+        identifier: str,
+        limit: int,
+        now: datetime,
+    ) -> bool:
+        values = {identifier_column: identifier, "analysis_count": 1, "updated_at": now}
+        identifier_field = table.c[identifier_column]
+        if connection.dialect.name == "postgresql":
+            postgresql_statement = postgresql_insert(table).values(**values)
+            result = connection.execute(
+                postgresql_statement.on_conflict_do_update(
+                    index_elements=[identifier_field],
+                    set_={"analysis_count": table.c.analysis_count + 1, "updated_at": now},
+                    where=table.c.analysis_count < limit,
+                )
+            )
+            return bool(result.rowcount)
+        if connection.dialect.name == "sqlite":
+            sqlite_statement = sqlite_insert(table).values(**values)
+            result = connection.execute(
+                sqlite_statement.on_conflict_do_update(
+                    index_elements=[identifier_field],
+                    set_={"analysis_count": table.c.analysis_count + 1, "updated_at": now},
+                    where=table.c.analysis_count < limit,
+                )
+            )
+            return bool(result.rowcount)
+        current = connection.execute(
+            select(table.c.analysis_count).where(identifier_field == identifier)
+        ).scalar_one_or_none()
+        if current is not None and current >= limit:
+            return False
+        if current is None:
+            connection.execute(table.insert().values(**values))
+        else:
+            connection.execute(
+                table.update()
+                .where(identifier_field == identifier)
+                .values(analysis_count=current + 1, updated_at=now)
+            )
+        return True
 
     @staticmethod
     def _link_user(connection: Connection, user_id: str, public_id: str, now: datetime) -> None:
