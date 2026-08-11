@@ -3,6 +3,16 @@ import re
 import tomllib
 
 from app.analysis.base import Analyzer
+from app.analysis.ecosystems import (
+    ecosystem_runtime,
+    parse_cargo,
+    parse_composer,
+    parse_dotnet,
+    parse_gemfile,
+    parse_go_mod,
+    parse_gradle,
+    parse_maven,
+)
 from app.schemas.analysis import (
     DependencyFinding,
     DependencyScope,
@@ -27,6 +37,20 @@ class DependencyAnalyzer(Analyzer[list[DependencyFinding]]):
                 findings.extend(self._requirements(file))
             elif name == "pyproject.toml":
                 findings.extend(self._pyproject(file))
+            elif name == "cargo.toml":
+                findings.extend(parse_cargo(file))
+            elif name == "go.mod":
+                findings.extend(parse_go_mod(file))
+            elif name == "pom.xml":
+                findings.extend(parse_maven(file))
+            elif name in {"build.gradle", "build.gradle.kts"}:
+                findings.extend(parse_gradle(file))
+            elif name == "gemfile":
+                findings.extend(parse_gemfile(file))
+            elif name == "composer.json":
+                findings.extend(parse_composer(file))
+            elif name.endswith((".csproj", ".fsproj", ".vbproj")):
+                findings.extend(parse_dotnet(file))
         unique = {
             (item.ecosystem, item.name.lower(), item.scope, item.source_path): item
             for item in findings
@@ -127,10 +151,10 @@ class RuntimeAnalyzer(Analyzer[list[RuntimeFinding]]):
                     version_constraint=match.group(1) if match else None,
                     evidence=[file.path],
                 )
-            elif name == "cargo.toml":
-                runtimes["Rust"] = RuntimeFinding(
-                    runtime="Rust", version_constraint=None, evidence=[file.path]
-                )
+            else:
+                runtime = ecosystem_runtime(file)
+                if runtime:
+                    runtimes[runtime.runtime] = runtime
         return sorted(runtimes.values(), key=lambda item: item.runtime)
 
     @staticmethod
@@ -176,6 +200,10 @@ class FrameworkDependencyAnalyzer:
         "fastapi": "FastAPI",
         "flask": "Flask",
         "django": "Django",
+        "rails": "Rails",
+        "laravel/framework": "Laravel",
+        "org.springframework.boot:spring-boot-starter": "Spring Boot",
+        "microsoft.aspnetcore.app": "ASP.NET Core",
     }
 
     def analyze(self, dependencies: list[DependencyFinding]) -> list[TechnologyFinding]:

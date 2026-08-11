@@ -17,14 +17,18 @@ Last updated: 2026-08-10
 - Responsive real-results workspace at `/analyze`.
 - Durable local SQLite storage, random public analysis IDs, shareable API/web routes, and a
   configurable transactional anonymous allowance using an HTTP-only cookie.
-- Verification: 20 backend tests, Python lint and strict typing, frontend lint and typing,
+- Direct dependency parsing expanded to Cargo, Go modules, Maven, Gradle, RubyGems, Composer,
+  and NuGet, including defensive malformed-manifest behavior.
+- Evidence-derived purpose, setup steps, prerequisites, compatibility conditions, strengths,
+  risks, missing essentials, and explicit unknowns are shown in the results workspace.
+- Verification: 37 backend tests, Python lint and strict typing, frontend lint and typing,
   and the Next.js production build.
 
 ## Planned
 
 - Supabase PostgreSQL connection, Alembic migrations, authentication, compatibility, and setup
   guidance.
-- Cargo, Go, Maven, and Gradle dependency parsers and broader framework/runtime coverage.
+- Broader lockfile/version-conflict analysis and README setup-section extraction.
 
 ## Known constraints
 

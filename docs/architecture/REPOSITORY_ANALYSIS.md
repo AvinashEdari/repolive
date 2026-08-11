@@ -31,6 +31,11 @@ Parsers currently support npm `package.json`, Python `requirements.txt`, PEP 621
 `pyproject.toml`, Node/Python/Go/Rust runtime signals, dependency-backed framework detection,
 documentation/testing/CI/container signals, and two explainable score categories.
 
+Direct dependency parsing also supports Cargo, Go modules, Maven, Gradle, Ruby Gemfiles,
+Composer, and .NET project files. Setup commands are generated only from recognized manifests
+or displayed verbatim from declared package scripts; their origin and source path remain attached.
+Compatibility conclusions are conditional or unknown unless repository evidence proves them.
+
 ## Implemented persistence and sharing
 
 Successful reports are stored through a SQLAlchemy-backed repository with random public IDs.

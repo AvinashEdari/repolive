@@ -3,6 +3,7 @@ from app.analysis.dependencies import (
     FrameworkDependencyAnalyzer,
     RuntimeAnalyzer,
 )
+from app.analysis.guidance import GuidanceAnalyzer
 from app.analysis.languages import LanguageAnalyzer
 from app.analysis.quality import QualityAnalyzer, ScoreAnalyzer
 from app.analysis.structure import ImportantFileAnalyzer, TechnologyAnalyzer
@@ -20,6 +21,7 @@ class AnalysisPipeline:
         self.framework_dependency_analyzer = FrameworkDependencyAnalyzer()
         self.quality_analyzer = QualityAnalyzer()
         self.score_analyzer = ScoreAnalyzer()
+        self.guidance_analyzer = GuidanceAnalyzer()
 
     def analyze(self, snapshot: RepositorySnapshot) -> AnalysisReport:
         dependencies = self.dependency_analyzer.analyze(snapshot)
@@ -28,18 +30,39 @@ class AnalysisPipeline:
             self.framework_dependency_analyzer.analyze(dependencies),
         )
         quality = self.quality_analyzer.analyze(snapshot)
+        runtimes = self.runtime_analyzer.analyze(snapshot)
+        (
+            setup_steps,
+            prerequisites,
+            compatibility,
+            strengths,
+            risks,
+            missing_essentials,
+            unknowns,
+        ) = self.guidance_analyzer.analyze(snapshot, runtimes, quality)
         project_types = self._project_types(snapshot, {item.name for item in technologies})
         return AnalysisReport(
             snapshot=snapshot,
             analysis=DeterministicAnalysis(
+                purpose_summary=(
+                    snapshot.metadata.description
+                    or f"A repository classified as {', '.join(project_types).lower()}."
+                ),
                 languages=self.language_analyzer.analyze(snapshot),
                 technologies=technologies,
                 important_files=self.important_file_analyzer.analyze(snapshot),
                 project_types=project_types,
                 dependencies=dependencies,
-                runtimes=self.runtime_analyzer.analyze(snapshot),
+                runtimes=runtimes,
                 quality=quality,
                 scores=self.score_analyzer.analyze(quality),
+                setup_steps=setup_steps,
+                prerequisites=prerequisites,
+                compatibility=compatibility,
+                strengths=strengths,
+                risks=risks,
+                missing_essentials=missing_essentials,
+                unknowns=unknowns,
             ),
         )
 

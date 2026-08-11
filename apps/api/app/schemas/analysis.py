@@ -6,6 +6,7 @@ from app.schemas.repository import RepositorySnapshot
 
 TechnologyCategory = Literal["framework", "build_tool", "infrastructure", "package_manager"]
 DependencyScope = Literal["runtime", "development", "optional", "unknown"]
+Platform = Literal["Windows", "Linux", "macOS"]
 
 
 class LanguageFinding(BaseModel):
@@ -63,7 +64,35 @@ class ExplainableScore(BaseModel):
     factors: list[ScoreFactor]
 
 
+class SetupStep(BaseModel):
+    title: str
+    command: str | None
+    origin: Literal["repository", "derived"]
+    source_path: str
+    platforms: list[Platform]
+
+
+class PrerequisiteFinding(BaseModel):
+    name: str
+    version_constraint: str | None
+    confidence: Literal["high", "medium"]
+    evidence: list[str]
+
+
+class CompatibilityFinding(BaseModel):
+    subject: str
+    status: Literal["compatible", "conditional", "unknown"]
+    detail: str
+    evidence: list[str]
+
+
+class InsightFinding(BaseModel):
+    label: str
+    evidence: list[str]
+
+
 class DeterministicAnalysis(BaseModel):
+    purpose_summary: str = "Repository purpose is not declared."
     languages: list[LanguageFinding]
     technologies: list[TechnologyFinding]
     important_files: list[ImportantFileFinding]
@@ -72,6 +101,13 @@ class DeterministicAnalysis(BaseModel):
     runtimes: list[RuntimeFinding]
     quality: QualitySignals
     scores: list[ExplainableScore]
+    setup_steps: list[SetupStep] = Field(default_factory=list)
+    prerequisites: list[PrerequisiteFinding] = Field(default_factory=list)
+    compatibility: list[CompatibilityFinding] = Field(default_factory=list)
+    strengths: list[InsightFinding] = Field(default_factory=list)
+    risks: list[InsightFinding] = Field(default_factory=list)
+    missing_essentials: list[InsightFinding] = Field(default_factory=list)
+    unknowns: list[InsightFinding] = Field(default_factory=list)
 
 
 class AnalysisReport(BaseModel):

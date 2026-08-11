@@ -20,11 +20,20 @@ _EVIDENCE_NAMES = {
     "pyproject.toml",
     "requirements.txt",
     "pipfile",
+    "gemfile",
+    "composer.json",
     "cargo.toml",
     "go.mod",
     "pom.xml",
     "build.gradle",
     "build.gradle.kts",
+    "gradle.properties",
+    "global.json",
+    ".nvmrc",
+    ".node-version",
+    ".python-version",
+    ".ruby-version",
+    ".tool-versions",
     "dockerfile",
     "docker-compose.yml",
     "docker-compose.yaml",
@@ -198,6 +207,7 @@ class GitHubRepositoryProvider(RepositoryProvider):
         name = path.name.lower()
         return (
             name in _EVIDENCE_NAMES
+            or name.endswith((".csproj", ".fsproj", ".vbproj"))
             or name == "readme"
             or name.startswith("readme.")
             or file.path.lower().startswith(".github/workflows/")
