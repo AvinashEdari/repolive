@@ -11,6 +11,22 @@ class RepositoryProviderError(RuntimeError):
     """Raised when a provider cannot safely retrieve repository data."""
 
 
+class RepositoryNotFoundError(RepositoryProviderError):
+    """Raised when a repository is unavailable to the configured provider."""
+
+
+class RepositoryRateLimitError(RepositoryProviderError):
+    """Raised when provider rate or access policy blocks retrieval."""
+
+
+class RepositoryTooLargeError(RepositoryProviderError):
+    """Raised when configured ingestion limits are exceeded."""
+
+
+class RepositoryConnectivityError(RepositoryProviderError):
+    """Raised when the provider cannot be reached within configured timeouts."""
+
+
 class RepositoryProvider(ABC):
     @abstractmethod
     def parse_url(self, url: str) -> RepositoryReference:

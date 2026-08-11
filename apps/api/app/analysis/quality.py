@@ -28,46 +28,72 @@ class QualityAnalyzer(Analyzer[QualitySignals]):
 
 
 class ScoreAnalyzer:
-    def analyze(self, quality: QualitySignals) -> list[ExplainableScore]:
+    def analyze(
+        self, quality: QualitySignals, snapshot: RepositorySnapshot
+    ) -> list[ExplainableScore]:
+        paths = [file.path for file in snapshot.files]
+        readme = [path for path in paths if PurePosixPath(path.lower()).name.startswith("readme")]
+        license_files = [
+            path for path in paths if PurePosixPath(path.lower()).name.startswith("license")
+        ]
+        environment = [path for path in paths if PurePosixPath(path.lower()).name == ".env.example"]
+        tests = [
+            path
+            for path in paths
+            if {"test", "tests", "spec", "specs"}.intersection(PurePosixPath(path.lower()).parts)
+        ]
+        ci = [path for path in paths if path.lower().startswith(".github/workflows/")]
+        containers = [
+            path
+            for path in paths
+            if PurePosixPath(path.lower()).name
+            in {"dockerfile", "compose.yml", "compose.yaml", "docker-compose.yml"}
+        ]
         documentation = self._score(
             "Documentation",
             [
-                (quality.has_readme, 55, "README present", "No README detected"),
-                (quality.has_license, 20, "License present", "No license detected"),
+                (quality.has_readme, 55, "README present", "No README detected", readme),
+                (
+                    quality.has_license,
+                    20,
+                    "License present",
+                    "No license detected",
+                    license_files,
+                ),
                 (
                     quality.has_environment_example,
                     25,
                     "Environment template present",
                     "No environment template detected",
+                    environment,
                 ),
             ],
         )
         engineering = self._score(
             "Engineering readiness",
             [
-                (quality.has_tests, 40, "Tests detected", "No tests detected"),
-                (quality.has_ci, 35, "CI workflow detected", "No CI workflow detected"),
+                (quality.has_tests, 40, "Tests detected", "No tests detected", tests),
+                (quality.has_ci, 35, "CI workflow detected", "No CI workflow detected", ci),
                 (
                     quality.has_container_config,
                     25,
                     "Container configuration detected",
                     "No container configuration detected",
+                    containers,
                 ),
             ],
         )
         return [documentation, engineering]
 
     @staticmethod
-    def _score(
-        name: str, factors: list[tuple[bool, int, str, str]]
-    ) -> ExplainableScore:
-        value = sum(weight for present, weight, _, _ in factors if present)
+    def _score(name: str, factors: list[tuple[bool, int, str, str, list[str]]]) -> ExplainableScore:
+        value = sum(weight for present, weight, _, _, _ in factors if present)
         explanations = [
             ScoreFactor(
                 label=positive if present else negative,
                 impact="positive" if present else "negative",
-                evidence=[],
+                evidence=evidence if present else [],
             )
-            for present, _, positive, negative in factors
+            for present, _, positive, negative, evidence in factors
         ]
         return ExplainableScore(name=name, value=value, factors=explanations)

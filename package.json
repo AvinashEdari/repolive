@@ -5,8 +5,7 @@
   "scripts": {
     "dev:web": "npm run dev --workspace @repolive/web",
     "build:web": "npm run build --workspace @repolive/web",
-    "check": "npm run lint --workspace @repolive/web && npm run typecheck --workspace @repolive/web"
+    "check": "npm run lint --workspace @repolive/web && npm run typecheck --workspace @repolive/web && npm run test --workspace @repolive/web"
   },
   "engines": { "node": ">=24" }
 }
-

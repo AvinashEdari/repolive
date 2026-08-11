@@ -106,3 +106,9 @@ def test_manifest_contents_drive_dependencies_frameworks_runtimes_and_scores() -
     assert report.analysis.runtimes[0].version_constraint == ">=22"
     assert report.analysis.quality.has_tests is True
     assert {score.value for score in report.analysis.scores} == {100}
+    assert all(
+        factor.evidence
+        for score in report.analysis.scores
+        for factor in score.factors
+        if factor.impact == "positive"
+    )

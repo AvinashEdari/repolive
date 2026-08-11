@@ -67,6 +67,9 @@ class GuidanceAnalyzer:
             unknowns.append(
                 InsightFinding(label="Runtime version requirements are not declared.", evidence=[])
             )
+        unknowns.extend(
+            InsightFinding(label=warning, evidence=[]) for warning in snapshot.ingestion_warnings
+        )
         return steps, prerequisites, compatibility, strengths, risks, missing, unknowns
 
     def _steps(self, snapshot: RepositorySnapshot) -> list[SetupStep]:
@@ -107,8 +110,7 @@ class GuidanceAnalyzer:
             elif name.endswith((".csproj", ".fsproj", ".vbproj")):
                 steps.append(self._derived("Restore .NET packages", "dotnet restore", file.path))
         if any(
-            PurePosixPath(path).name.startswith(("compose.", "docker-compose."))
-            for path in paths
+            PurePosixPath(path).name.startswith(("compose.", "docker-compose.")) for path in paths
         ):
             steps.append(
                 self._derived(

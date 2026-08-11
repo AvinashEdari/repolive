@@ -1,8 +1,15 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.api.routes.analyses import get_analysis_store, get_repository_provider
 from app.main import app
-from app.providers.base import RepositoryProvider
+from app.providers.base import (
+    RepositoryConnectivityError,
+    RepositoryNotFoundError,
+    RepositoryProvider,
+    RepositoryRateLimitError,
+    RepositoryTooLargeError,
+)
 from app.schemas.repository import (
     RepositoryFile,
     RepositoryMetadata,
@@ -49,6 +56,7 @@ class FakeRepositoryProvider(RepositoryProvider):
             files=[RepositoryFile(path="README.md", size_bytes=10)],
         )
 
+
 client = TestClient(app)
 fake_store = FakeAnalysisStore()
 app.dependency_overrides[get_repository_provider] = FakeRepositoryProvider
@@ -60,7 +68,10 @@ def test_analysis_request_validates_repository() -> None:
         "/api/v1/analyses", json={"repository_url": "https://github.com/openai/openai-python"}
     )
     assert response.status_code == 200
-    assert response.json()["snapshot"]["repository"]["canonical_url"] == "https://github.com/openai/openai-python"
+    assert (
+        response.json()["snapshot"]["repository"]["canonical_url"]
+        == "https://github.com/openai/openai-python"
+    )
     assert response.json()["snapshot"]["files"][0]["path"] == "README.md"
     assert "text_content" not in response.json()["snapshot"]["files"][0]
     assert response.json()["analysis"]["important_files"][0]["role"] == "Primary documentation"
@@ -82,3 +93,45 @@ def test_analysis_request_rejects_non_github_host() -> None:
 def test_unknown_public_analysis_is_not_found() -> None:
     response = client.get("/api/v1/analyses/missing")
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_status"),
+    [
+        (RepositoryNotFoundError("missing"), 404),
+        (RepositoryRateLimitError("limited"), 429),
+        (RepositoryTooLargeError("large"), 413),
+        (RepositoryConnectivityError("offline"), 504),
+    ],
+)
+def test_provider_failures_have_specific_api_contracts(
+    error: Exception, expected_status: int
+) -> None:
+    class FailingProvider(FakeRepositoryProvider):
+        async def fetch_snapshot(self, repository: RepositoryReference) -> RepositorySnapshot:
+            del repository
+            raise error
+
+    app.dependency_overrides[get_repository_provider] = FailingProvider
+    try:
+        response = client.post(
+            "/api/v1/analyses", json={"repository_url": "https://github.com/a/b"}
+        )
+    finally:
+        app.dependency_overrides[get_repository_provider] = FakeRepositoryProvider
+    assert response.status_code == expected_status
+
+
+def test_oversized_request_body_is_rejected_before_validation() -> None:
+    response = client.post(
+        "/api/v1/analyses",
+        content="x" * 5000,
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 413
+
+
+def test_security_and_cache_headers_are_present() -> None:
+    response = client.get("/api/v1/health")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"

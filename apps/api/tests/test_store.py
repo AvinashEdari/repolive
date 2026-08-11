@@ -5,13 +5,15 @@ from app.schemas.analysis import AnalysisReport, DeterministicAnalysis, QualityS
 from app.schemas.repository import RepositoryMetadata, RepositoryReference, RepositorySnapshot
 
 
-def empty_report() -> AnalysisReport:
+def empty_report(commit_sha: str = "commit-1", version: str = "1") -> AnalysisReport:
     return AnalysisReport(
+        analysis_version=version,
         snapshot=RepositorySnapshot(
             repository=RepositoryReference(
                 owner="a", name="b", canonical_url="https://github.com/a/b"
             ),
             metadata=RepositoryMetadata(
+                commit_sha=commit_sha,
                 description=None,
                 default_branch="main",
                 stars=0,
@@ -51,5 +53,13 @@ def test_store_persists_public_report_and_enforces_limit() -> None:
 
     assert first.public_id is not None
     assert store.get(first.public_id) == first
+    assert store.save(empty_report(), "another-browser", 1) == first
     with pytest.raises(AnonymousLimitExceeded):
-        store.save(empty_report(), "browser", 1)
+        store.save(empty_report(commit_sha="commit-2"), "browser", 1)
+
+
+def test_analysis_version_invalidates_cached_report() -> None:
+    store = AnalysisStore("sqlite:///:memory:")
+    first = store.save(empty_report(version="1"), "browser", 2)
+    second = store.save(empty_report(version="2"), "browser", 2)
+    assert first.public_id != second.public_id

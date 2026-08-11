@@ -43,10 +43,15 @@ SQLite is the verified local database. Anonymous usage is counted transactionall
 HTTP-only browser identifier and the configurable free-analysis allowance. Stored reports are
 available from the API and the server-rendered `/analysis/{public_id}` web route.
 
+Repository metadata includes the default-branch commit SHA. The store normalizes provider,
+owner, and repository identity and reuses a report only when both commit SHA and
+`ANALYSIS_VERSION` match. Alembic owns the production schema; automatic table creation is
+disabled in production.
+
 ## Next pipeline milestone
 
-Add Alembic migrations and the PostgreSQL driver before connecting a Supabase project. Then
-expand Cargo, Go, Maven, and Gradle dependency parsing and produce evidence-based OS-specific
-setup steps.
+Connect and verify a user-authorized Supabase project, then add authenticated history and private
+repository authorization. Expand lockfile conflict analysis and README setup-section extraction
+without treating prose as an executable instruction source.
 
 Pipeline: validation, provider retrieval, bounded ingestion, deterministic analyzers, explainable scoring, persistence, and presentation. Facts retain evidence and confidence.

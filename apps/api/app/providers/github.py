@@ -6,7 +6,15 @@ from urllib.parse import urlsplit
 import httpx
 
 from app.core.config import Settings, get_settings
-from app.providers.base import InvalidRepositoryUrl, RepositoryProvider, RepositoryProviderError
+from app.providers.base import (
+    InvalidRepositoryUrl,
+    RepositoryConnectivityError,
+    RepositoryNotFoundError,
+    RepositoryProvider,
+    RepositoryProviderError,
+    RepositoryRateLimitError,
+    RepositoryTooLargeError,
+)
 from app.schemas.repository import (
     RepositoryFile,
     RepositoryMetadata,
@@ -91,13 +99,28 @@ class GitHubRepositoryProvider(RepositoryProvider):
 
         owns_client = self.client is None
         client = self.client or httpx.AsyncClient(
-            base_url="https://api.github.com", headers=headers, timeout=15.0
+            base_url="https://api.github.com",
+            headers=headers,
+            timeout=self.settings.github_request_timeout_seconds,
         )
         try:
             metadata_response = await client.get(f"/repos/{repository.owner}/{repository.name}")
             self._raise_for_status(metadata_response)
             metadata_payload = metadata_response.json()
+            if not isinstance(metadata_payload, dict):
+                raise RepositoryProviderError("GitHub returned invalid repository metadata.")
             default_branch = str(metadata_payload["default_branch"])
+
+            commit_response = await client.get(
+                f"/repos/{repository.owner}/{repository.name}/commits/{default_branch}"
+            )
+            self._raise_for_status(commit_response)
+            commit_payload = commit_response.json()
+            if not isinstance(commit_payload, dict) or not isinstance(
+                commit_payload.get("sha"), str
+            ):
+                raise RepositoryProviderError("GitHub returned invalid commit metadata.")
+            commit_sha = commit_payload["sha"]
 
             tree_response = await client.get(
                 f"/repos/{repository.owner}/{repository.name}/git/trees/{default_branch}",
@@ -105,8 +128,10 @@ class GitHubRepositoryProvider(RepositoryProvider):
             )
             self._raise_for_status(tree_response)
             tree_payload = tree_response.json()
+            if not isinstance(tree_payload, dict) or not isinstance(tree_payload.get("tree"), list):
+                raise RepositoryProviderError("GitHub returned an invalid repository tree.")
             if tree_payload.get("truncated"):
-                raise RepositoryProviderError(
+                raise RepositoryTooLargeError(
                     "Repository tree exceeds GitHub's safe recursive response limit."
                 )
 
@@ -116,21 +141,25 @@ class GitHubRepositoryProvider(RepositoryProvider):
                     size_bytes=item.get("size"),
                     content_id=item.get("sha"),
                 )
-                for item in tree_payload.get("tree", [])
-                if item.get("type") == "blob" and isinstance(item.get("path"), str)
+                for item in tree_payload["tree"]
+                if isinstance(item, dict)
+                and item.get("type") == "blob"
+                and item.get("mode") != "120000"
+                and isinstance(item.get("path"), str)
             ]
             if len(files) > self.settings.max_repository_files:
-                raise RepositoryProviderError("Repository exceeds the configured file limit.")
+                raise RepositoryTooLargeError("Repository exceeds the configured file limit.")
             known_bytes = sum(item.size_bytes or 0 for item in files)
             if known_bytes > self.settings.max_repository_bytes:
-                raise RepositoryProviderError("Repository exceeds the configured size limit.")
+                raise RepositoryTooLargeError("Repository exceeds the configured size limit.")
 
-            await self._hydrate_evidence_files(client, repository, files)
+            ingestion_warnings = await self._hydrate_evidence_files(client, repository, files)
 
             license_data = metadata_payload.get("license") or {}
             return RepositorySnapshot(
                 repository=repository,
                 metadata=RepositoryMetadata(
+                    commit_sha=commit_sha,
                     description=metadata_payload.get("description"),
                     default_branch=default_branch,
                     stars=metadata_payload.get("stargazers_count", 0),
@@ -143,13 +172,14 @@ class GitHubRepositoryProvider(RepositoryProvider):
                     last_pushed_at=metadata_payload.get("pushed_at"),
                 ),
                 files=files,
+                ingestion_warnings=ingestion_warnings,
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise RepositoryProviderError(
                 "GitHub returned an invalid repository response."
             ) from exc
         except httpx.RequestError as exc:
-            raise RepositoryProviderError("GitHub could not be reached.") from exc
+            raise RepositoryConnectivityError("GitHub could not be reached.") from exc
         finally:
             if owns_client:
                 await client.aclose()
@@ -157,9 +187,11 @@ class GitHubRepositoryProvider(RepositoryProvider):
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
         if response.status_code == 404:
-            raise RepositoryProviderError("Repository was not found or is not public.")
+            raise RepositoryNotFoundError("Repository was not found or is not public.")
         if response.status_code == 403:
-            raise RepositoryProviderError("GitHub rate limit or access policy blocked the request.")
+            raise RepositoryRateLimitError(
+                "GitHub rate limit or access policy blocked the request."
+            )
         if response.is_error:
             raise RepositoryProviderError("GitHub returned an unexpected error.")
 
@@ -168,9 +200,13 @@ class GitHubRepositoryProvider(RepositoryProvider):
         client: httpx.AsyncClient,
         repository: RepositoryReference,
         files: list[RepositoryFile],
-    ) -> None:
+    ) -> list[str]:
+        warnings: list[str] = []
         eligible = [file for file in files if self._is_evidence_file(file)]
         if len(eligible) > self.settings.max_evidence_files:
+            warnings.append(
+                "Some evidence files were skipped because the file-count limit was reached."
+            )
             eligible = eligible[: self.settings.max_evidence_files]
 
         total_bytes = 0
@@ -180,9 +216,16 @@ class GitHubRepositoryProvider(RepositoryProvider):
             response = await client.get(
                 f"/repos/{repository.owner}/{repository.name}/git/blobs/{file.content_id}"
             )
+            if response.status_code == 404:
+                warnings.append(f"Evidence content was unavailable: {file.path}")
+                continue
             self._raise_for_status(response)
             payload = response.json()
-            if payload.get("encoding") != "base64" or not isinstance(payload.get("content"), str):
+            if (
+                not isinstance(payload, dict)
+                or payload.get("encoding") != "base64"
+                or not isinstance(payload.get("content"), str)
+            ):
                 raise RepositoryProviderError("GitHub returned an invalid evidence file.")
             try:
                 encoded = "".join(payload["content"].split())
@@ -192,13 +235,19 @@ class GitHubRepositoryProvider(RepositoryProvider):
             try:
                 text = raw.decode("utf-8")
             except UnicodeDecodeError:
+                warnings.append(f"Non-UTF-8 evidence was skipped: {file.path}")
                 continue
             if len(raw) > self.settings.max_evidence_file_bytes:
+                warnings.append(f"Oversized evidence was skipped: {file.path}")
                 continue
             total_bytes += len(raw)
             if total_bytes > self.settings.max_evidence_total_bytes:
+                warnings.append(
+                    "Some evidence files were skipped because the byte limit was reached."
+                )
                 break
             file.text_content = text
+        return warnings
 
     def _is_evidence_file(self, file: RepositoryFile) -> bool:
         if file.size_bytes is not None and file.size_bytes > self.settings.max_evidence_file_bytes:

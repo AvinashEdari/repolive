@@ -6,8 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.analysis.pipeline import AnalysisPipeline
 from app.core.config import get_settings
-from app.db.store import AnalysisStore, AnonymousLimitExceeded
-from app.providers.base import InvalidRepositoryUrl, RepositoryProvider, RepositoryProviderError
+from app.db.store import AnalysisPersistenceError, AnalysisStore, AnonymousLimitExceeded
+from app.providers.base import (
+    InvalidRepositoryUrl,
+    RepositoryConnectivityError,
+    RepositoryNotFoundError,
+    RepositoryProvider,
+    RepositoryProviderError,
+    RepositoryRateLimitError,
+    RepositoryTooLargeError,
+)
 from app.providers.github import GitHubRepositoryProvider
 from app.schemas.analysis import AnalysisReport
 from app.schemas.repository import AnalysisRequest
@@ -21,7 +29,8 @@ def get_repository_provider() -> RepositoryProvider:
 
 @lru_cache
 def get_analysis_store() -> AnalysisStore:
-    return AnalysisStore(get_settings().database_url)
+    settings = get_settings()
+    return AnalysisStore(settings.database_url, create_schema=settings.app_env != "production")
 
 
 @router.post("", response_model=AnalysisReport, status_code=status.HTTP_200_OK)
@@ -38,9 +47,21 @@ async def request_analysis(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
         snapshot = await provider.fetch_snapshot(repository)
+    except RepositoryNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RepositoryRateLimitError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except RepositoryTooLargeError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    except RepositoryConnectivityError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
     except RepositoryProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    report = AnalysisPipeline().analyze(snapshot)
+    report = (
+        AnalysisPipeline()
+        .analyze(snapshot)
+        .model_copy(update={"analysis_version": get_settings().analysis_version})
+    )
     anonymous_id = request.cookies.get("repolive_anonymous_id") or secrets.token_urlsafe(24)
     try:
         stored_report = store.save(
@@ -50,6 +71,11 @@ async def request_analysis(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Anonymous analysis allowance exhausted.",
+        ) from exc
+    except AnalysisPersistenceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Analysis completed but could not be persisted. Please retry.",
         ) from exc
     response.set_cookie(
         "repolive_anonymous_id",

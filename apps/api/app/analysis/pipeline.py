@@ -55,7 +55,7 @@ class AnalysisPipeline:
                 dependencies=dependencies,
                 runtimes=runtimes,
                 quality=quality,
-                scores=self.score_analyzer.analyze(quality),
+                scores=self.score_analyzer.analyze(quality, snapshot),
                 setup_steps=setup_steps,
                 prerequisites=prerequisites,
                 compatibility=compatibility,

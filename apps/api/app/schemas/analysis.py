@@ -91,6 +91,13 @@ class InsightFinding(BaseModel):
     evidence: list[str]
 
 
+class ExplanationResult(BaseModel):
+    enabled: bool
+    provider: str
+    summary: str
+    label: Literal["deterministic fallback", "optional explanation"]
+
+
 class DeterministicAnalysis(BaseModel):
     purpose_summary: str = "Repository purpose is not declared."
     languages: list[LanguageFinding]
@@ -112,6 +119,13 @@ class DeterministicAnalysis(BaseModel):
 
 class AnalysisReport(BaseModel):
     public_id: str | None = None
+    analysis_version: str = "1"
     snapshot: RepositorySnapshot
     analysis: DeterministicAnalysis
+    explanation: ExplanationResult = ExplanationResult(
+        enabled=False,
+        provider="disabled",
+        summary="Optional explanations are disabled; deterministic findings remain available.",
+        label="deterministic fallback",
+    )
     status: Literal["analyzed"] = "analyzed"

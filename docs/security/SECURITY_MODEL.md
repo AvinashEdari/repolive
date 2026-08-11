@@ -10,3 +10,9 @@ Public analysis identifiers are generated from cryptographically secure random b
 up with parameterized SQLAlchemy statements. Anonymous identifiers are random HTTP-only,
 SameSite=Lax cookies and are marked Secure in production. Cookie clearing can bypass this MVP
 allowance, so production abuse protection still requires IP/risk-based rate limiting.
+
+The API uses explicit trusted hosts and CORS origins, rejects oversized declared request bodies,
+maps provider failure classes without leaking credentials, and returns nosniff, frame-denial,
+referrer, CSP, and cache-control headers. GitHub retrieval uses an official fixed API host,
+per-request timeouts, bounded request counts, strict response-shape validation, and skips symlinks
+and submodules. Missing, non-UTF-8, or oversized evidence becomes a partial-analysis warning.

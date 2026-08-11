@@ -16,6 +16,7 @@ class AnalysisRequest(BaseModel):
 
 
 class RepositoryMetadata(BaseModel):
+    commit_sha: str = "unknown"
     description: str | None
     default_branch: str
     stars: int = Field(ge=0)
@@ -39,4 +40,5 @@ class RepositorySnapshot(BaseModel):
     repository: RepositoryReference
     metadata: RepositoryMetadata
     files: list[RepositoryFile]
+    ingestion_warnings: list[str] = Field(default_factory=list)
     status: Literal["ingested"] = "ingested"

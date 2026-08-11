@@ -11,9 +11,7 @@ from app.schemas.repository import (
 
 def snapshot(path: str, content: str) -> RepositorySnapshot:
     return RepositorySnapshot(
-        repository=RepositoryReference(
-            owner="a", name="b", canonical_url="https://github.com/a/b"
-        ),
+        repository=RepositoryReference(owner="a", name="b", canonical_url="https://github.com/a/b"),
         metadata=RepositoryMetadata(
             description=None,
             default_branch="main",
@@ -86,13 +84,9 @@ def test_supported_manifest_parsers(
         ),
     ],
 )
-def test_supported_runtime_parsers(
-    path: str, content: str, runtime: str, constraint: str
-) -> None:
+def test_supported_runtime_parsers(path: str, content: str, runtime: str, constraint: str) -> None:
     findings = RuntimeAnalyzer().analyze(snapshot(path, content))
-    assert [(item.runtime, item.version_constraint) for item in findings] == [
-        (runtime, constraint)
-    ]
+    assert [(item.runtime, item.version_constraint) for item in findings] == [(runtime, constraint)]
 
 
 @pytest.mark.parametrize(

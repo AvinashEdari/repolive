@@ -57,6 +57,8 @@ async def test_fetches_bounded_repository_snapshot() -> None:
                     "pushed_at": "2026-08-01T12:00:00Z",
                 },
             )
+        if request.url.path.endswith("/commits/main"):
+            return httpx.Response(200, json={"sha": "commit-123"})
         return httpx.Response(
             200,
             json={
@@ -73,9 +75,12 @@ async def test_fetches_bounded_repository_snapshot() -> None:
         transport=httpx.MockTransport(respond), base_url="https://api.github.com"
     ) as client:
         github = GitHubRepositoryProvider(Settings(), client)
-        snapshot = await github.fetch_snapshot(github.parse_url("https://github.com/openai/openai-python"))
+        snapshot = await github.fetch_snapshot(
+            github.parse_url("https://github.com/openai/openai-python")
+        )
 
     assert snapshot.metadata.primary_language == "Python"
+    assert snapshot.metadata.commit_sha == "commit-123"
     assert snapshot.metadata.license_spdx == "Apache-2.0"
     assert [file.path for file in snapshot.files] == ["README.md", "src/client.py"]
 
@@ -83,6 +88,8 @@ async def test_fetches_bounded_repository_snapshot() -> None:
 @pytest.mark.asyncio
 async def test_rejects_truncated_tree() -> None:
     def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/commits/main"):
+            return httpx.Response(200, json={"sha": "commit-123"})
         if "/git/trees/" in request.url.path:
             return httpx.Response(200, json={"truncated": True, "tree": []})
         return httpx.Response(200, json={"default_branch": "main"})
@@ -100,6 +107,8 @@ async def test_fetches_only_allowlisted_bounded_evidence_content() -> None:
     package = b'{"dependencies":{"react":"^19.0.0"}}'
 
     def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/commits/main"):
+            return httpx.Response(200, json={"sha": "commit-123"})
         if request.url.path.endswith("/git/trees/main"):
             return httpx.Response(
                 200,
@@ -129,3 +138,83 @@ async def test_fetches_only_allowlisted_bounded_evidence_content() -> None:
 
     assert result.files[0].text_content == package.decode()
     assert result.files[1].text_content is None
+
+
+@pytest.mark.asyncio
+async def test_missing_evidence_blob_returns_partial_snapshot_warning() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/commits/main"):
+            return httpx.Response(200, json={"sha": "commit-123"})
+        if request.url.path.endswith("/git/trees/main"):
+            return httpx.Response(
+                200,
+                json={
+                    "truncated": False,
+                    "tree": [{"path": "package.json", "type": "blob", "size": 10, "sha": "gone"}],
+                },
+            )
+        if request.url.path.endswith("/git/blobs/gone"):
+            return httpx.Response(404)
+        return httpx.Response(200, json={"default_branch": "main"})
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(respond), base_url="https://api.github.com"
+    ) as client:
+        github = GitHubRepositoryProvider(Settings(), client)
+        result = await github.fetch_snapshot(github.parse_url("https://github.com/a/b"))
+
+    assert result.files[0].text_content is None
+    assert result.ingestion_warnings == ["Evidence content was unavailable: package.json"]
+
+
+@pytest.mark.asyncio
+async def test_malformed_commit_response_is_rejected() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/commits/main"):
+            return httpx.Response(200, json=[])
+        return httpx.Response(200, json={"default_branch": "main"})
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(respond), base_url="https://api.github.com"
+    ) as client:
+        github = GitHubRepositoryProvider(Settings(), client)
+        with pytest.raises(RepositoryProviderError, match="commit metadata"):
+            await github.fetch_snapshot(github.parse_url("https://github.com/a/b"))
+
+
+@pytest.mark.asyncio
+async def test_symlinks_and_submodules_are_not_hydrated_as_evidence() -> None:
+    requested_blobs = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/commits/main"):
+            return httpx.Response(200, json={"sha": "commit"})
+        if request.url.path.endswith("/git/trees/main"):
+            return httpx.Response(
+                200,
+                json={
+                    "truncated": False,
+                    "tree": [
+                        {
+                            "path": "package.json",
+                            "type": "blob",
+                            "mode": "120000",
+                            "sha": "link",
+                        },
+                        {"path": "vendor", "type": "commit", "sha": "submodule"},
+                    ],
+                },
+            )
+        if "/git/blobs/" in request.url.path:
+            requested_blobs.append(request.url.path)
+        return httpx.Response(200, json={"default_branch": "main"})
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(respond), base_url="https://api.github.com"
+    ) as client:
+        result = await GitHubRepositoryProvider(Settings(), client).fetch_snapshot(
+            GitHubRepositoryProvider().parse_url("https://github.com/a/b")
+        )
+
+    assert result.files == []
+    assert requested_blobs == []

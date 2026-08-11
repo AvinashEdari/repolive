@@ -4,5 +4,5 @@
 2. Bounded GitHub ingestion and deterministic analyzers.
 3. Real results UI and explainable scoring. (Implemented)
 4. Persistence, quotas, and sharing. (Local MVP implemented; production database pending)
-5. Setup, compatibility, and optional explanations.
+5. Setup, compatibility, and optional explanations. (Deterministic/fallback MVP implemented)
 6. Security hardening and isolated execution research.

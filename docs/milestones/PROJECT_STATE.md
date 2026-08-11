@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-10
+Last updated: 2026-08-11
 
 ## Implemented and verified
 
@@ -21,13 +21,19 @@ Last updated: 2026-08-10
   and NuGet, including defensive malformed-manifest behavior.
 - Evidence-derived purpose, setup steps, prerequisites, compatibility conditions, strengths,
   risks, missing essentials, and explicit unknowns are shown in the results workspace.
-- Verification: 37 backend tests, Python lint and strict typing, frontend lint and typing,
-  and the Next.js production build.
+- Commit-SHA and analysis-version cache reuse, normalized persistence fields, Alembic migrations,
+  and installed PostgreSQL/Supabase driver boundary.
+- Typed provider failures, partial evidence warnings, security headers, trusted hosts, request
+  size/time limits, strict production configuration, and a disabled explanation-provider path.
+- Verification: 51 backend tests, 2 frontend interaction tests, migration upgrade/downgrade,
+  Python lint and strict typing, frontend lint and typing, and the Next.js production build.
+- Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
+  guidance, cache reuse, and exclusion of raw evidence content.
 
 ## Planned
 
-- Supabase PostgreSQL connection, Alembic migrations, authentication, compatibility, and setup
-  guidance.
+- Live Supabase project connection, Supabase authentication, account history, and private
+  repository authorization.
 - Broader lockfile/version-conflict analysis and README setup-section extraction.
 
 ## Known constraints
@@ -39,5 +45,7 @@ Last updated: 2026-08-10
   ignored `.venv311` project environment; neither environment is committed.
 - Legacy landing-page source files are owned by an inaccessible prior sandbox identity. The new
   results workspace was added as `/analyze`; linking it from `/` remains blocked by that ACL.
-- SQLite is verified locally. Production PostgreSQL/Supabase migrations and distributed abuse
-  controls are not yet implemented.
+- SQLite and migrations are verified locally. The PostgreSQL driver and migration path are
+  implemented, but no live Supabase database has been configured or deployed.
+- Cookie quotas deter ordinary anonymous overuse but require distributed IP/risk controls for
+  production abuse resistance.
