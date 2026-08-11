@@ -1,7 +1,14 @@
 # Deployment
 
-Deployment has not been performed. The following steps require user-provided infrastructure and
-credentials.
+The staging stack was deployed and validated on 2026-08-11:
+
+- Frontend: `https://repolive-web.vercel.app` (Vercel)
+- Backend: `https://repolive-api.onrender.com` (Render)
+- Database and authentication: Supabase PostgreSQL and Supabase Auth
+
+The following procedure remains the deployment checklist for a replacement staging or production
+environment. Provider credentials and database secrets are intentionally not stored in this
+repository.
 
 1. Create a Supabase/PostgreSQL database and obtain its server-side connection URL.
 2. Set `APP_ENV=production`, a `postgresql+psycopg://` `DATABASE_URL`, HTTPS `WEB_ORIGIN`, explicit
