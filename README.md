@@ -3,6 +3,7 @@
 RepoLive turns public source repositories into evidence-based, beginner-friendly technical reports. It validates GitHub URLs, ingests bounded public metadata and allowlisted textual evidence, and deterministically reports languages, dependencies, runtimes, tooling, important files, quality signals, and explainable scores. It does not execute repository code.
 
 The product shell is available at `/`; the full analysis workspace is available at `/analyze`.
+Successful analyses receive durable public IDs and render at `/analysis/{public_id}`.
 
 ## Local development
 

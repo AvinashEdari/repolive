@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     app_env: Literal["development", "test", "production"] = "development"
     web_origin: str = "http://localhost:3000"
+    database_url: str = "sqlite:///./repolive.db"
     github_token: str | None = None
     free_anonymous_analysis_limit: int = Field(default=5, ge=1, le=100)
     max_repository_files: int = Field(default=10_000, ge=1)

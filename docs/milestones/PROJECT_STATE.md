@@ -15,12 +15,15 @@ Last updated: 2026-08-10
 - Dependency parsing for npm and Python, runtime constraints, dependency-backed frameworks,
   documentation/test/CI/container signals, and explainable documentation/readiness scores.
 - Responsive real-results workspace at `/analyze`.
-- Verification: 18 backend tests, Python lint and strict typing, frontend lint and typing,
+- Durable local SQLite storage, random public analysis IDs, shareable API/web routes, and a
+  configurable transactional anonymous allowance using an HTTP-only cookie.
+- Verification: 20 backend tests, Python lint and strict typing, frontend lint and typing,
   and the Next.js production build.
 
 ## Planned
 
-- Persistence, shareable results, usage limits, authentication, compatibility, and setup guidance.
+- Supabase PostgreSQL connection, Alembic migrations, authentication, compatibility, and setup
+  guidance.
 - Cargo, Go, Maven, and Gradle dependency parsers and broader framework/runtime coverage.
 
 ## Known constraints
@@ -32,3 +35,5 @@ Last updated: 2026-08-10
   ignored `.venv311` project environment; neither environment is committed.
 - Legacy landing-page source files are owned by an inaccessible prior sandbox identity. The new
   results workspace was added as `/analyze`; linking it from `/` remains blocked by that ACL.
+- SQLite is verified locally. Production PostgreSQL/Supabase migrations and distributed abuse
+  controls are not yet implemented.

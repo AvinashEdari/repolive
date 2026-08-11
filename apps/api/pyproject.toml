@@ -10,6 +10,7 @@ dependencies = [
   "fastapi==0.141.1",
   "httpx>=0.28.1,<0.29",
   "pydantic-settings>=2.10,<3",
+  "sqlalchemy>=2.0.43,<3",
   "uvicorn[standard]>=0.35,<0.36"
 ]
 
@@ -35,4 +36,3 @@ select = ["E", "F", "I", "B", "UP"]
 python_version = "3.11"
 strict = true
 packages = ["app"]
-

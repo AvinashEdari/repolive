@@ -75,6 +75,7 @@ class DeterministicAnalysis(BaseModel):
 
 
 class AnalysisReport(BaseModel):
+    public_id: str | None = None
     snapshot: RepositorySnapshot
     analysis: DeterministicAnalysis
     status: Literal["analyzed"] = "analyzed"

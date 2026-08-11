@@ -31,10 +31,17 @@ Parsers currently support npm `package.json`, Python `requirements.txt`, PEP 621
 `pyproject.toml`, Node/Python/Go/Rust runtime signals, dependency-backed framework detection,
 documentation/testing/CI/container signals, and two explainable score categories.
 
+## Implemented persistence and sharing
+
+Successful reports are stored through a SQLAlchemy-backed repository with random public IDs.
+SQLite is the verified local database. Anonymous usage is counted transactionally against an
+HTTP-only browser identifier and the configurable free-analysis allowance. Stored reports are
+available from the API and the server-rendered `/analysis/{public_id}` web route.
+
 ## Next pipeline milestone
 
-Add persistent analysis records and stable public IDs before enabling shareable analysis routes.
-Then expand parsers for Cargo, Go, Maven, and Gradle dependencies and produce evidence-based
-OS-specific setup steps.
+Add Alembic migrations and the PostgreSQL driver before connecting a Supabase project. Then
+expand Cargo, Go, Maven, and Gradle dependency parsing and produce evidence-based OS-specific
+setup steps.
 
 Pipeline: validation, provider retrieval, bounded ingestion, deterministic analyzers, explainable scoring, persistence, and presentation. Facts retain evidence and confidence.

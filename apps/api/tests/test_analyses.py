@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.api.routes.analyses import get_repository_provider
+from app.api.routes.analyses import get_analysis_store, get_repository_provider
 from app.main import app
 from app.providers.base import RepositoryProvider
 from app.schemas.repository import (
@@ -9,6 +9,20 @@ from app.schemas.repository import (
     RepositoryReference,
     RepositorySnapshot,
 )
+
+
+class FakeAnalysisStore:
+    def __init__(self) -> None:
+        self.reports: dict[str, object] = {}
+
+    def save(self, report: object, anonymous_id: str, limit: int) -> object:
+        del anonymous_id, limit
+        stored = report.model_copy(update={"public_id": "public-test-id"})
+        self.reports["public-test-id"] = stored
+        return stored
+
+    def get(self, public_id: str) -> object | None:
+        return self.reports.get(public_id)
 
 
 class FakeRepositoryProvider(RepositoryProvider):
@@ -36,7 +50,9 @@ class FakeRepositoryProvider(RepositoryProvider):
         )
 
 client = TestClient(app)
+fake_store = FakeAnalysisStore()
 app.dependency_overrides[get_repository_provider] = FakeRepositoryProvider
+app.dependency_overrides[get_analysis_store] = lambda: fake_store
 
 
 def test_analysis_request_validates_repository() -> None:
@@ -48,6 +64,12 @@ def test_analysis_request_validates_repository() -> None:
     assert response.json()["snapshot"]["files"][0]["path"] == "README.md"
     assert "text_content" not in response.json()["snapshot"]["files"][0]
     assert response.json()["analysis"]["important_files"][0]["role"] == "Primary documentation"
+    assert response.json()["public_id"] == "public-test-id"
+    assert response.cookies.get("repolive_anonymous_id")
+
+    shared = client.get("/api/v1/analyses/public-test-id")
+    assert shared.status_code == 200
+    assert shared.json()["public_id"] == "public-test-id"
 
 
 def test_analysis_request_rejects_non_github_host() -> None:
@@ -55,3 +77,8 @@ def test_analysis_request_rejects_non_github_host() -> None:
         "/api/v1/analyses", json={"repository_url": "https://example.com/openai/openai-python"}
     )
     assert response.status_code == 422
+
+
+def test_unknown_public_analysis_is_not_found() -> None:
+    response = client.get("/api/v1/analyses/missing")
+    assert response.status_code == 404

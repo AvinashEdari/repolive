@@ -3,7 +3,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import styles from "./results.module.css";
 
-type Report = { snapshot: { repository: { owner: string; name: string; canonical_url: string }; metadata: { description: string | null; stars: number; forks: number; open_issues: number }; files: { path: string }[] }; analysis: { project_types: string[]; languages: { name: string; share_percent: number }[]; technologies: { name: string }[]; dependencies: { name: string; version_constraint: string | null; ecosystem: string }[]; runtimes: { runtime: string; version_constraint: string | null }[]; important_files: { path: string; role: string }[]; scores: { name: string; value: number; factors: { label: string }[] }[] } };
+export type Report = { public_id: string | null; snapshot: { repository: { owner: string; name: string; canonical_url: string }; metadata: { description: string | null; stars: number; forks: number; open_issues: number }; files: { path: string }[] }; analysis: { project_types: string[]; languages: { name: string; share_percent: number }[]; technologies: { name: string }[]; dependencies: { name: string; version_constraint: string | null; ecosystem: string }[]; runtimes: { runtime: string; version_constraint: string | null }[]; important_files: { path: string; role: string }[]; scores: { name: string; value: number; factors: { label: string }[] }[] } };
 
 export default function AnalyzePage() {
   const [url, setUrl] = useState(""); const [report, setReport] = useState<Report | null>(null);
@@ -23,9 +23,9 @@ export default function AnalyzePage() {
     {report && <Results report={report}/>}</main>;
 }
 
-function Results({ report }: { report: Report }) {
+export function Results({ report }: { report: Report }) {
   const { snapshot, analysis } = report;
-  return <section className={styles.results}><div className={styles.title}><div><p>ANALYSIS COMPLETE</p><h2>{snapshot.repository.owner} / {snapshot.repository.name}</h2><span>{snapshot.metadata.description ?? "No description provided."}</span></div><a href={snapshot.repository.canonical_url} target="_blank" rel="noreferrer">View on GitHub ↗</a></div>
+  return <section className={styles.results}><div className={styles.title}><div><p>ANALYSIS COMPLETE</p><h2>{snapshot.repository.owner} / {snapshot.repository.name}</h2><span>{snapshot.metadata.description ?? "No description provided."}</span></div><div>{report.public_id&&<a href={`/analysis/${report.public_id}`}>Share analysis</a>} <a href={snapshot.repository.canonical_url} target="_blank" rel="noreferrer">View on GitHub ↗</a></div></div>
     <div className={styles.metrics}>{[["Files",snapshot.files.length],["Stars",snapshot.metadata.stars],["Forks",snapshot.metadata.forks],["Issues",snapshot.metadata.open_issues]].map(([label,value])=><div key={label}><b>{Number(value).toLocaleString()}</b><span>{label}</span></div>)}</div>
     <div className={styles.grid}>{analysis.scores.map((score)=><article key={score.name}><h3>{score.name}<b>{score.value}</b></h3><progress max="100" value={score.value}/><ul>{score.factors.map((factor)=><li key={factor.label}>{factor.label}</li>)}</ul></article>)}</div>
     <div className={styles.grid}><Card title="Project profile"><Tags values={analysis.project_types}/></Card><Card title="Languages">{analysis.languages.map((item)=><div className={styles.language} key={item.name}><span>{item.name}</span><b>{item.share_percent}%</b><i style={{width:`${item.share_percent}%`}}/></div>)}</Card><Card title="Frameworks & tooling"><Tags values={analysis.technologies.map((item)=>item.name)}/></Card><Card title="Runtimes">{analysis.runtimes.length?<ul>{analysis.runtimes.map((item)=><li key={item.runtime}><b>{item.runtime}</b> {item.version_constraint??"version unspecified"}</li>)}</ul>:<p>No explicit runtime constraint detected.</p>}</Card></div>
