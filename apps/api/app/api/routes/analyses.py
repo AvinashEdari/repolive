@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.analysis.pipeline import AnalysisPipeline
 from app.auth import AuthUser, get_optional_user, require_user
+from app.compatibility import MachineCompatibilityResult, MachineProfile, evaluate_machine
 from app.core.config import get_settings
 from app.db.store import (
     AnalysisPersistenceError,
@@ -108,6 +109,18 @@ def delete_analysis_history_item(
     if not store.remove_for_user(user.user_id, public_id):
         raise HTTPException(status_code=404, detail="Saved analysis not found.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{public_id}/compatibility", response_model=MachineCompatibilityResult)
+def check_machine_compatibility(
+    public_id: str,
+    machine: MachineProfile,
+    store: Annotated[AnalysisStore, Depends(get_analysis_store)],
+) -> MachineCompatibilityResult:
+    report = store.get(public_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Analysis not found.")
+    return evaluate_machine(report, machine)
 
 
 @router.get("/{public_id}", response_model=AnalysisReport)

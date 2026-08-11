@@ -31,7 +31,10 @@ Last updated: 2026-08-11
   cache-state reporting, and authorization-scoped saved history are implemented.
 - Alembic-managed user-to-analysis links support private listing and removal without exposing
   account data through stable public reports.
-- Verification: 55 backend tests, 2 frontend interaction tests, migration upgrade/downgrade,
+- Users can compare explicitly supplied OS, architecture, runtime versions, and Docker availability
+  with repository evidence. Results are compatible, probably compatible, incompatible, or unknown;
+  absent hardware requirements are never guessed.
+- Verification: 57 backend tests, 2 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.
