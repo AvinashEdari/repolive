@@ -54,12 +54,12 @@ Last updated: 2026-08-11
   `https://repolive-api.onrender.com` and uses Supabase PostgreSQL and Supabase Auth.
 - Staging validation confirmed HTTPS liveness/readiness, Alembic startup migration, PostgreSQL
   connectivity, exact-origin credentialed CORS, secure cookies, bounded public analysis, cache
-  reuse, public sharing, machine compatibility, invalid-login handling, login, and logout.
+  reuse, public sharing, machine compatibility, invalid-login handling, login, logout, authenticated
+  persistence, private history, and cross-user history isolation.
 - Desktop and mobile viewport checks found no horizontal overflow on the analysis workspace.
 
 ## Planned
 
-- Full authenticated-history ownership smoke testing from an unrestricted external browser.
 - Private repository authorization.
 - Broader lockfile/version-conflict analysis and README setup-section extraction.
 
@@ -72,8 +72,6 @@ Last updated: 2026-08-11
   ignored `.venv-verify` Python 3.11 environment; environments are not committed.
 - Legacy landing-page source files are owned by an inaccessible prior sandbox identity. The new
   results workspace was added as `/analyze`; linking it from `/` remains blocked by that ACL.
-- Supabase PostgreSQL, Supabase Auth, Render, and Vercel are configured for staging. The Codex
-  in-app browser blocks direct client requests to `onrender.com`; direct HTTPS and CORS checks pass,
-  but authenticated-history ownership should also be exercised in a normal external browser.
+- Supabase PostgreSQL, Supabase Auth, Render, and Vercel are configured and verified for staging.
 - Cookie quotas deter ordinary anonymous overuse but require distributed IP/risk controls for
   production abuse resistance.
