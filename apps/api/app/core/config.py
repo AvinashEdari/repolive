@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     database_connect_timeout_seconds: int = Field(default=10, ge=1, le=60)
     analysis_version: str = "1"
     github_token: str | None = None
+    supabase_url: str | None = None
+    supabase_jwt_audience: str = "authenticated"
+    auth_jwks_timeout_seconds: int = Field(default=5, ge=1, le=30)
     github_request_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
     free_anonymous_analysis_limit: int = Field(default=5, ge=1, le=100)
     max_repository_files: int = Field(default=10_000, ge=1)
@@ -38,6 +41,8 @@ class Settings(BaseSettings):
             raise ValueError("Production WEB_ORIGIN must use HTTPS.")
         if "*" in hosts or "localhost" in hosts or "127.0.0.1" in hosts:
             raise ValueError("Production ALLOWED_HOSTS must name deployed hosts explicitly.")
+        if not self.supabase_url or not self.supabase_url.startswith("https://"):
+            raise ValueError("Production requires an HTTPS SUPABASE_URL.")
         return self
 
 

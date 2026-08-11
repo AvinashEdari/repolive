@@ -53,7 +53,9 @@ def test_store_persists_public_report_and_enforces_limit() -> None:
 
     assert first.public_id is not None
     assert store.get(first.public_id) == first
-    assert store.save(empty_report(), "another-browser", 1) == first
+    cached = store.save(empty_report(), "another-browser", 1)
+    assert cached.public_id == first.public_id
+    assert cached.cache_status == "cached"
     with pytest.raises(AnonymousLimitExceeded):
         store.save(empty_report(commit_sha="commit-2"), "browser", 1)
 
@@ -63,6 +65,21 @@ def test_analysis_version_invalidates_cached_report() -> None:
     first = store.save(empty_report(version="1"), "browser", 2)
     second = store.save(empty_report(version="2"), "browser", 2)
     assert first.public_id != second.public_id
+
+
+def test_authenticated_history_is_private_idempotent_and_removable() -> None:
+    store = AnalysisStore("sqlite:///:memory:")
+    first = store.save(empty_report(), "browser", 2, "user-a")
+    cached = store.save(empty_report(), "another", 2, "user-a")
+    store.save(empty_report(), "another", 2, "user-b")
+    assert cached.cache_status == "cached"
+    history = store.list_for_user("user-a")
+    assert len(history) == 1
+    assert history[0]["public_id"] == first.public_id
+    assert store.remove_for_user("user-a", str(first.public_id)) is True
+    assert store.list_for_user("user-a") == []
+    assert len(store.list_for_user("user-b")) == 1
+    assert store.get(str(first.public_id)) is not None
 
 
 def test_database_ping_uses_live_connection() -> None:

@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.routes.analyses import get_analysis_store, get_repository_provider
+from app.auth import AuthUser, get_optional_user
 from app.main import app
 from app.providers.base import (
     RepositoryConnectivityError,
@@ -22,14 +23,24 @@ class FakeAnalysisStore:
     def __init__(self) -> None:
         self.reports: dict[str, object] = {}
 
-    def save(self, report: object, anonymous_id: str, limit: int) -> object:
-        del anonymous_id, limit
+    def save(
+        self, report: object, anonymous_id: str, limit: int, user_id: str | None = None
+    ) -> object:
+        del anonymous_id, limit, user_id
         stored = report.model_copy(update={"public_id": "public-test-id"})
         self.reports["public-test-id"] = stored
         return stored
 
     def get(self, public_id: str) -> object | None:
         return self.reports.get(public_id)
+
+    def list_for_user(self, user_id: str) -> list[dict[str, object]]:
+        del user_id
+        return []
+
+    def remove_for_user(self, user_id: str, public_id: str) -> bool:
+        del user_id, public_id
+        return True
 
 
 class FakeRepositoryProvider(RepositoryProvider):
@@ -93,6 +104,16 @@ def test_analysis_request_rejects_non_github_host() -> None:
 def test_unknown_public_analysis_is_not_found() -> None:
     response = client.get("/api/v1/analyses/missing")
     assert response.status_code == 404
+
+
+def test_history_requires_authentication_and_accepts_verified_user() -> None:
+    assert client.get("/api/v1/analyses/me/history").status_code == 401
+    app.dependency_overrides[get_optional_user] = lambda: AuthUser("user-1", "a@example.com")
+    try:
+        assert client.get("/api/v1/analyses/me/history").json() == []
+        assert client.delete("/api/v1/analyses/me/history/public-test-id").status_code == 204
+    finally:
+        app.dependency_overrides.pop(get_optional_user)
 
 
 @pytest.mark.parametrize(

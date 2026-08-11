@@ -10,6 +10,10 @@
 - `WEB_ORIGIN`: exact browser origin allowed by CORS; HTTPS is required in production.
 - `ALLOWED_HOSTS`: comma-separated API hostnames; local/wildcard values are rejected in production.
 - `GITHUB_TOKEN`: optional server-only token for higher GitHub API limits. Never expose it publicly.
+- `SUPABASE_URL`: project URL used by the API to validate Supabase JWT issuer and public signing keys.
+- `SUPABASE_JWT_AUDIENCE`: expected access-token audience; normally `authenticated`.
+- `AUTH_JWKS_TIMEOUT_SECONDS`: bounded public signing-key lookup timeout.
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`: browser-safe Supabase Auth configuration. Never use a service-role key here.
 - `GITHUB_REQUEST_TIMEOUT_SECONDS`: timeout applied to each GitHub API request.
 - `FREE_ANONYMOUS_ANALYSIS_LIMIT`: successful new analyses allowed per anonymous cookie identity.
 - `MAX_REPOSITORY_FILES`, `MAX_REPOSITORY_BYTES`: repository snapshot limits.

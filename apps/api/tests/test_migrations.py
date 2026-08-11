@@ -19,6 +19,7 @@ def test_migrations_upgrade_and_downgrade_schema() -> None:
         assert set(inspector.get_table_names()) == {
             "alembic_version",
             "analyses",
+            "analysis_user_links",
             "anonymous_usage",
         }
         command.downgrade(config, "base")

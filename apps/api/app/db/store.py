@@ -6,6 +6,7 @@ from functools import lru_cache
 from sqlalchemy import (
     Column,
     DateTime,
+    ForeignKey,
     Integer,
     MetaData,
     String,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
+from sqlalchemy.engine import Connection
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql import select, text
@@ -49,6 +51,18 @@ anonymous_usage = Table(
     Column("anonymous_id", String(128), primary_key=True),
     Column("analysis_count", Integer, nullable=False, default=0),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+analysis_user_links = Table(
+    "analysis_user_links",
+    metadata,
+    Column("user_id", String(128), primary_key=True),
+    Column(
+        "public_id",
+        String(32),
+        ForeignKey("analyses.public_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("saved_at", DateTime(timezone=True), nullable=False),
 )
 
 
@@ -94,7 +108,9 @@ class AnalysisStore:
         if create_schema:
             metadata.create_all(self.engine)
 
-    def save(self, report: AnalysisReport, anonymous_id: str, limit: int) -> AnalysisReport:
+    def save(
+        self, report: AnalysisReport, anonymous_id: str, limit: int, user_id: str | None = None
+    ) -> AnalysisReport:
         now = datetime.now(UTC)
         identity = self._identity(report)
         try:
@@ -109,7 +125,10 @@ class AnalysisStore:
                     )
                 ).scalar_one_or_none()
                 if cached_json is not None:
-                    return AnalysisReport.model_validate(json.loads(cached_json))
+                    cached = AnalysisReport.model_validate(json.loads(cached_json))
+                    if user_id and cached.public_id:
+                        self._link_user(connection, user_id, cached.public_id, now)
+                    return cached.model_copy(update={"cache_status": "cached"})
                 usage = connection.execute(
                     select(anonymous_usage.c.analysis_count).where(
                         anonymous_usage.c.anonymous_id == anonymous_id
@@ -141,9 +160,59 @@ class AnalysisStore:
                         created_at=now,
                     )
                 )
+                if user_id:
+                    self._link_user(connection, user_id, public_id, now)
         except SQLAlchemyError as exc:
             raise AnalysisPersistenceError("Analysis persistence failed.") from exc
         return stored_report
+
+    @staticmethod
+    def _link_user(connection: Connection, user_id: str, public_id: str, now: datetime) -> None:
+        existing = connection.execute(
+            select(analysis_user_links.c.public_id).where(
+                analysis_user_links.c.user_id == user_id,
+                analysis_user_links.c.public_id == public_id,
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            connection.execute(
+                analysis_user_links.insert().values(
+                    user_id=user_id, public_id=public_id, saved_at=now
+                )
+            )
+
+    def list_for_user(self, user_id: str) -> list[dict[str, object]]:
+        query = (
+            select(analyses, analysis_user_links.c.saved_at)
+            .join(analysis_user_links, analyses.c.public_id == analysis_user_links.c.public_id)
+            .where(analysis_user_links.c.user_id == user_id)
+            .order_by(analysis_user_links.c.saved_at.desc())
+        )
+        with self.engine.connect() as connection:
+            rows = connection.execute(query).mappings().all()
+        return [
+            {
+                "public_id": row["public_id"],
+                "owner": row["owner"],
+                "repository_name": row["repository_name"],
+                "commit_sha": row["commit_sha"],
+                "saved_at": row["saved_at"],
+                "scores": AnalysisReport.model_validate(
+                    json.loads(row["report_json"])
+                ).analysis.scores,
+            }
+            for row in rows
+        ]
+
+    def remove_for_user(self, user_id: str, public_id: str) -> bool:
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                analysis_user_links.delete().where(
+                    analysis_user_links.c.user_id == user_id,
+                    analysis_user_links.c.public_id == public_id,
+                )
+            )
+        return bool(result.rowcount)
 
     def get(self, public_id: str) -> AnalysisReport | None:
         with self.engine.connect() as connection:

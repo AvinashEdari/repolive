@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.analysis.pipeline import AnalysisPipeline
+from app.auth import AuthUser, get_optional_user, require_user
 from app.core.config import get_settings
 from app.db.store import (
     AnalysisPersistenceError,
@@ -21,7 +22,7 @@ from app.providers.base import (
     RepositoryTooLargeError,
 )
 from app.providers.github import GitHubRepositoryProvider
-from app.schemas.analysis import AnalysisReport
+from app.schemas.analysis import AnalysisHistoryItem, AnalysisReport
 from app.schemas.repository import AnalysisRequest
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
@@ -38,6 +39,7 @@ async def request_analysis(
     response: Response,
     provider: Annotated[RepositoryProvider, Depends(get_repository_provider)],
     store: Annotated[AnalysisStore, Depends(get_analysis_store)],
+    user: Annotated[AuthUser | None, Depends(get_optional_user)],
 ) -> AnalysisReport:
     try:
         repository = provider.parse_url(payload.repository_url)
@@ -63,7 +65,10 @@ async def request_analysis(
     anonymous_id = request.cookies.get("repolive_anonymous_id") or secrets.token_urlsafe(24)
     try:
         stored_report = store.save(
-            report, anonymous_id, get_settings().free_anonymous_analysis_limit
+            report,
+            anonymous_id,
+            get_settings().free_anonymous_analysis_limit,
+            user.user_id if user else None,
         )
     except AnonymousLimitExceeded as exc:
         raise HTTPException(
@@ -84,6 +89,25 @@ async def request_analysis(
         max_age=60 * 60 * 24 * 365,
     )
     return stored_report
+
+
+@router.get("/me/history", response_model=list[AnalysisHistoryItem])
+def get_analysis_history(
+    user: Annotated[AuthUser, Depends(require_user)],
+    store: Annotated[AnalysisStore, Depends(get_analysis_store)],
+) -> list[AnalysisHistoryItem]:
+    return [AnalysisHistoryItem.model_validate(item) for item in store.list_for_user(user.user_id)]
+
+
+@router.delete("/me/history/{public_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_analysis_history_item(
+    public_id: str,
+    user: Annotated[AuthUser, Depends(require_user)],
+    store: Annotated[AnalysisStore, Depends(get_analysis_store)],
+) -> Response:
+    if not store.remove_for_user(user.user_id, public_id):
+        raise HTTPException(status_code=404, detail="Saved analysis not found.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{public_id}", response_model=AnalysisReport)

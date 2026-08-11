@@ -15,5 +15,6 @@ def test_production_accepts_explicit_https_postgres_configuration() -> None:
         database_url="postgresql+psycopg://user:password@db.example/repolive",
         web_origin="https://repolive.example",
         allowed_hosts="api.repolive.example",
+        supabase_url="https://project.supabase.co",
     )
     assert settings.app_env == "production"

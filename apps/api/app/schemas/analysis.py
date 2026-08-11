@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -129,3 +130,13 @@ class AnalysisReport(BaseModel):
         label="deterministic fallback",
     )
     status: Literal["analyzed"] = "analyzed"
+    cache_status: Literal["new", "cached"] = "new"
+
+
+class AnalysisHistoryItem(BaseModel):
+    public_id: str
+    owner: str
+    repository_name: str
+    commit_sha: str
+    saved_at: datetime
+    scores: list[ExplainableScore]

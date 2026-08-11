@@ -27,15 +27,18 @@ Last updated: 2026-08-11
   size/time limits, strict production configuration, and a disabled explanation-provider path.
 - PostgreSQL staging readiness includes bounded/pre-ping connection pooling, connect/wait/recycle
   timeouts, database readiness probes, a Render blueprint, and explicit backup/restore guidance.
-- Verification: 53 backend tests, 2 frontend interaction tests, migration upgrade/downgrade,
+- Supabase account UI, server-side access-token verification, anonymous or authenticated analysis,
+  cache-state reporting, and authorization-scoped saved history are implemented.
+- Alembic-managed user-to-analysis links support private listing and removal without exposing
+  account data through stable public reports.
+- Verification: 55 backend tests, 2 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.
 
 ## Planned
 
-- Live Supabase project connection, Supabase authentication, account history, and private
-  repository authorization.
+- Live Supabase project authentication verification and private repository authorization.
 - Broader lockfile/version-conflict analysis and README setup-section extraction.
 
 ## Known constraints
@@ -43,8 +46,8 @@ Last updated: 2026-08-11
 - Docker CLI is installed but its daemon was not running during discovery.
 - GitHub authentication is optional; unauthenticated API rate limits apply when `GITHUB_TOKEN`
   is unset.
-- A stale `.venv` references a removed Python installation. Verification currently uses the
-  ignored `.venv311` project environment; neither environment is committed.
+- Historical virtual environments reference removed Python installations. Verification uses the
+  ignored `.venv-verify` Python 3.11 environment; environments are not committed.
 - Legacy landing-page source files are owned by an inaccessible prior sandbox identity. The new
   results workspace was added as `/analyze`; linking it from `/` remains blocked by that ACL.
 - SQLite and migrations are verified locally. The PostgreSQL driver and migration path are
