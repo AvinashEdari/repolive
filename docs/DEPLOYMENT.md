@@ -41,6 +41,81 @@ access tokens, connection strings, or service-role credentials.
 - FastAPI: Render web service using the checked-in `render.yaml`.
 - Database: Supabase PostgreSQL direct/server connection string with TLS required.
 
+Configure the Vercel project with repository root directory `apps/web`. Keep the Render Blueprint
+at the repository root; its service `rootDir` is already `apps/api`. Do not add a proxy or change
+the application architecture solely for staging.
+
+## Exact environment-variable matrix
+
+### Supabase project
+
+Supabase produces or controls these values. Copy values through provider dashboards, never through
+source control.
+
+| Variable or setting | Classification | Required | Consumer |
+| --- | --- | --- | --- |
+| PostgreSQL connection string → `DATABASE_URL` | Backend-only secret | Yes | Render and Alembic |
+| Project URL → `SUPABASE_URL` | Backend-only configuration | Yes | Render JWT verifier |
+| Project URL → `NEXT_PUBLIC_SUPABASE_URL` | Public frontend | Yes for auth | Vercel |
+| Anon/publishable key → `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public frontend | Yes for auth | Vercel |
+| JWT audience → `SUPABASE_JWT_AUDIENCE` | Backend-only configuration | Yes | Render; normally `authenticated` |
+| Auth Site URL | Supabase dashboard setting | Yes | Exact staging frontend origin |
+| Auth Redirect URLs | Supabase dashboard setting | As needed | Exact staging callback/origin URLs |
+
+RepoLive does not use a Supabase service-role key. Prefer the Supabase session pooler when Render
+requires IPv4 connectivity; use the connection URI exactly as supplied and retain TLS parameters.
+
+### Render backend
+
+| Variable | Classification | Required | Recommended staging value |
+| --- | --- | --- | --- |
+| `APP_ENV` | Backend-only configuration | Yes | `production` |
+| `DATABASE_URL` | Backend-only secret | Yes | Supabase PostgreSQL/Supavisor URI |
+| `WEB_ORIGIN` | Backend-only configuration | Yes | Exact Vercel staging origin, HTTPS, no path |
+| `ALLOWED_HOSTS` | Backend-only configuration | Yes | Exact Render API hostname, no scheme/path/wildcard |
+| `SUPABASE_URL` | Backend-only configuration | Yes | Exact Supabase project HTTPS origin |
+| `SUPABASE_JWT_AUDIENCE` | Backend-only configuration | Yes | `authenticated` |
+| `GITHUB_TOKEN` | Backend-only secret | Optional | Fine-grained/read-only token for higher API limits |
+| `ANALYSIS_VERSION` | Backend-only configuration | Yes | Increment only when analysis rules change |
+| `DATABASE_POOL_SIZE` | Backend-only configuration | Optional | `5` |
+| `DATABASE_MAX_OVERFLOW` | Backend-only configuration | Optional | `5` |
+| `DATABASE_POOL_TIMEOUT_SECONDS` | Backend-only configuration | Optional | `10` |
+| `DATABASE_POOL_RECYCLE_SECONDS` | Backend-only configuration | Optional | `300` |
+| `DATABASE_CONNECT_TIMEOUT_SECONDS` | Backend-only configuration | Optional | `10` |
+| `AUTH_JWKS_TIMEOUT_SECONDS` | Backend-only configuration | Optional | `5` |
+| `GITHUB_REQUEST_TIMEOUT_SECONDS` | Backend-only configuration | Optional | `15` |
+| `FREE_ANONYMOUS_ANALYSIS_LIMIT` | Backend-only configuration | Optional | `5` |
+| `MAX_REPOSITORY_FILES` | Backend-only configuration | Optional | `10000` |
+| `MAX_REPOSITORY_BYTES` | Backend-only configuration | Optional | `104857600` |
+| `MAX_EVIDENCE_FILES` | Backend-only configuration | Optional | `40` |
+| `MAX_EVIDENCE_FILE_BYTES` | Backend-only configuration | Optional | `262144` |
+| `MAX_EVIDENCE_TOTAL_BYTES` | Backend-only configuration | Optional | `2097152` |
+
+`DATABASE_URL`, `GITHUB_TOKEN`, and any future credentials must be entered as Render secrets. The
+checked-in Blueprint intentionally contains names and safe defaults only.
+
+### Vercel frontend
+
+| Variable | Classification | Required | Value |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | Public frontend | Yes | Exact Render HTTPS origin, no trailing path |
+| `NEXT_PUBLIC_SUPABASE_URL` | Public frontend | Yes for auth | Exact Supabase project HTTPS origin |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public frontend | Yes for auth | Supabase anon/publishable key |
+
+Only `NEXT_PUBLIC_*` variables are referenced by frontend source. Never add `DATABASE_URL`,
+`GITHUB_TOKEN`, a service-role key, or any backend token to Vercel.
+
+## Staging smoke-test record
+
+After both services are deployed, record pass/fail for HTTPS liveness and readiness, `/analyze`, a
+successful small public GitHub analysis, provider error/partial behavior, sign-up/login/logout,
+private history, machine compatibility, cache reuse, and a logged-out public share page. Repeat the
+critical flow at desktop and mobile widths. Inspect browser network responses for mixed content,
+stack traces, tokens, database details, raw repository evidence, and unexpected cookies.
+
+The deployed URLs must be copied from the provider after successful deployment. Never substitute
+example or predicted hostnames in a completion report.
+
 The API exposes `/api/v1/health/live` for process liveness and `/api/v1/health/ready` for a real
 database `SELECT 1` readiness check. Production uses pre-ping, bounded overflow, connection wait,
 connect timeout, and connection recycling. Migration processes use a one-shot non-pooled

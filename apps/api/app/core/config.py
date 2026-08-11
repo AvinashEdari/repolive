@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     def validate_production_settings(self) -> "Settings":
         if self.app_env != "production":
             return self
-        hosts = {host.strip() for host in self.allowed_hosts.split(",")}
+        hosts = [host.strip() for host in self.allowed_hosts.split(",")]
         database_scheme = urlsplit(self.database_url).scheme
         if database_scheme not in {"postgresql", "postgresql+psycopg"}:
             raise ValueError("Production requires a PostgreSQL DATABASE_URL.")
@@ -50,7 +50,13 @@ class Settings(BaseSettings):
             or web_origin.fragment
         ):
             raise ValueError("Production WEB_ORIGIN must use HTTPS.")
-        if "*" in hosts or "localhost" in hosts or "127.0.0.1" in hosts:
+        if (
+            not hosts
+            or any(not host for host in hosts)
+            or any("*" in host or "://" in host or "/" in host or ":" in host for host in hosts)
+            or "localhost" in hosts
+            or "127.0.0.1" in hosts
+        ):
             raise ValueError("Production ALLOWED_HOSTS must name deployed hosts explicitly.")
         supabase_url = urlsplit(self.supabase_url or "")
         if (

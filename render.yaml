@@ -12,11 +12,41 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "5"
+      - key: DATABASE_POOL_TIMEOUT_SECONDS
+        value: "10"
+      - key: DATABASE_POOL_RECYCLE_SECONDS
+        value: "300"
+      - key: DATABASE_CONNECT_TIMEOUT_SECONDS
+        value: "10"
       - key: WEB_ORIGIN
         sync: false
       - key: ALLOWED_HOSTS
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      - key: AUTH_JWKS_TIMEOUT_SECONDS
+        value: "5"
       - key: GITHUB_TOKEN
         sync: false
       - key: ANALYSIS_VERSION
         value: "1"
+      - key: GITHUB_REQUEST_TIMEOUT_SECONDS
+        value: "15"
+      - key: FREE_ANONYMOUS_ANALYSIS_LIMIT
+        value: "5"
+      - key: MAX_REPOSITORY_FILES
+        value: "10000"
+      - key: MAX_REPOSITORY_BYTES
+        value: "104857600"
+      - key: MAX_EVIDENCE_FILES
+        value: "40"
+      - key: MAX_EVIDENCE_FILE_BYTES
+        value: "262144"
+      - key: MAX_EVIDENCE_TOTAL_BYTES
+        value: "2097152"

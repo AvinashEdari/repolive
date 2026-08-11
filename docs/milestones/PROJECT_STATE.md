@@ -43,7 +43,10 @@ Last updated: 2026-08-11
 - Production configuration accepts only the supported PostgreSQL driver and exact HTTPS web and
   Supabase origins. Migration tests verify keys, cache uniqueness, ownership indexes, cascade
   behavior, downgrade, and offline PostgreSQL DDL generation.
-- Verification: 71 backend tests, 6 frontend interaction tests, migration upgrade/downgrade,
+- The Render Blueprint now declares the full production pool, authentication, request, evidence,
+  and quota configuration. Deployment documentation defines exact Supabase, Render, and Vercel
+  variable boundaries and staging smoke-test requirements.
+- Verification: 78 backend tests, 6 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.
@@ -65,5 +68,7 @@ Last updated: 2026-08-11
   results workspace was added as `/analyze`; linking it from `/` remains blocked by that ACL.
 - SQLite and migrations are verified locally. The PostgreSQL driver and migration path are
   implemented, but no live Supabase database has been configured or deployed.
+- Vercel, Render, and Supabase deployment configuration is prepared, but this workspace has no
+  authenticated provider CLI or dashboard session; no staging URL has been created or claimed.
 - Cookie quotas deter ordinary anonymous overuse but require distributed IP/risk controls for
   production abuse resistance.

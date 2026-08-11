@@ -59,3 +59,18 @@ def test_production_rejects_non_origin_urls(field: str, value: str, message: str
     }
     with pytest.raises(ValidationError, match=message):
         Settings(**options)
+
+
+@pytest.mark.parametrize(
+    "allowed_hosts",
+    ["", "*", "*.example.com", "https://api.example.com", "api.example.com/path", "a.com,,b.com"],
+)
+def test_production_requires_exact_nonempty_trusted_hosts(allowed_hosts: str) -> None:
+    with pytest.raises(ValidationError, match="ALLOWED_HOSTS"):
+        Settings(
+            app_env="production",
+            database_url="postgresql+psycopg://user:password@db.example/repolive",
+            web_origin="https://repolive.example",
+            allowed_hosts=allowed_hosts,
+            supabase_url="https://project.supabase.co",
+        )
