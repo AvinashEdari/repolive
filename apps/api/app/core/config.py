@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,13 +36,32 @@ class Settings(BaseSettings):
         if self.app_env != "production":
             return self
         hosts = {host.strip() for host in self.allowed_hosts.split(",")}
-        if self.database_url.startswith("sqlite"):
+        database_scheme = urlsplit(self.database_url).scheme
+        if database_scheme not in {"postgresql", "postgresql+psycopg"}:
             raise ValueError("Production requires a PostgreSQL DATABASE_URL.")
-        if not self.web_origin.startswith("https://"):
+        web_origin = urlsplit(self.web_origin)
+        if (
+            web_origin.scheme != "https"
+            or not web_origin.hostname
+            or web_origin.username
+            or web_origin.password
+            or web_origin.path not in {"", "/"}
+            or web_origin.query
+            or web_origin.fragment
+        ):
             raise ValueError("Production WEB_ORIGIN must use HTTPS.")
         if "*" in hosts or "localhost" in hosts or "127.0.0.1" in hosts:
             raise ValueError("Production ALLOWED_HOSTS must name deployed hosts explicitly.")
-        if not self.supabase_url or not self.supabase_url.startswith("https://"):
+        supabase_url = urlsplit(self.supabase_url or "")
+        if (
+            supabase_url.scheme != "https"
+            or not supabase_url.hostname
+            or supabase_url.username
+            or supabase_url.password
+            or supabase_url.path not in {"", "/"}
+            or supabase_url.query
+            or supabase_url.fragment
+        ):
             raise ValueError("Production requires an HTTPS SUPABASE_URL.")
         return self
 

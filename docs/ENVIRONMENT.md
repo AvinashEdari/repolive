@@ -1,7 +1,8 @@
 # Environment reference
 
 - `APP_ENV`: `development`, `test`, or `production`. Production activates strict validation.
-- `DATABASE_URL`: SQLAlchemy URL. SQLite is the local default; production requires PostgreSQL.
+- `DATABASE_URL`: server-only SQLAlchemy URL. SQLite is the local default; production accepts
+  `postgresql://` or `postgresql+psycopg://` with the synchronous psycopg driver.
 - `DATABASE_POOL_SIZE`, `DATABASE_MAX_OVERFLOW`: bounded production connection-pool capacity.
 - `DATABASE_POOL_TIMEOUT_SECONDS`: maximum wait for a pooled connection.
 - `DATABASE_POOL_RECYCLE_SECONDS`: retires long-lived connections before provider idle limits.
@@ -24,3 +25,5 @@ No AI environment variable is required. The explanation provider is disabled by 
 
 Use `.env.production.example` only as a variable-name reference. Replace every example hostname
 and credential through the deployment platform's secret manager; never commit the populated file.
+The API and migration process need `DATABASE_URL`, but the browser must never receive it. The
+Supabase anon key is designed for browser use; a service-role key is not used anywhere in RepoLive.

@@ -88,6 +88,9 @@ def test_analysis_request_validates_repository() -> None:
     assert response.json()["analysis"]["important_files"][0]["role"] == "Primary documentation"
     assert response.json()["public_id"] == "public-test-id"
     assert response.cookies.get("repolive_anonymous_id")
+    cookie = response.headers["set-cookie"].lower()
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
 
     shared = client.get("/api/v1/analyses/public-test-id")
     assert shared.status_code == 200

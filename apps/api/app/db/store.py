@@ -15,6 +15,8 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import StaticPool
@@ -129,25 +131,26 @@ class AnalysisStore:
                     if user_id and cached.public_id:
                         self._link_user(connection, user_id, cached.public_id, now)
                     return cached.model_copy(update={"cache_status": "cached"})
-                usage = connection.execute(
-                    select(anonymous_usage.c.analysis_count).where(
-                        anonymous_usage.c.anonymous_id == anonymous_id
-                    )
-                ).scalar_one_or_none()
-                if usage is not None and usage >= limit:
-                    raise AnonymousLimitExceeded
-                if usage is None:
-                    connection.execute(
-                        anonymous_usage.insert().values(
-                            anonymous_id=anonymous_id, analysis_count=1, updated_at=now
+                if user_id is None:
+                    usage = connection.execute(
+                        select(anonymous_usage.c.analysis_count).where(
+                            anonymous_usage.c.anonymous_id == anonymous_id
                         )
-                    )
-                else:
-                    connection.execute(
-                        anonymous_usage.update()
-                        .where(anonymous_usage.c.anonymous_id == anonymous_id)
-                        .values(analysis_count=usage + 1, updated_at=now)
-                    )
+                    ).scalar_one_or_none()
+                    if usage is not None and usage >= limit:
+                        raise AnonymousLimitExceeded
+                    if usage is None:
+                        connection.execute(
+                            anonymous_usage.insert().values(
+                                anonymous_id=anonymous_id, analysis_count=1, updated_at=now
+                            )
+                        )
+                    else:
+                        connection.execute(
+                            anonymous_usage.update()
+                            .where(anonymous_usage.c.anonymous_id == anonymous_id)
+                            .values(analysis_count=usage + 1, updated_at=now)
+                        )
                 public_id = secrets.token_urlsafe(12)
                 stored_report = report.model_copy(update={"public_id": public_id})
                 serialized = stored_report.model_dump_json()
@@ -168,18 +171,16 @@ class AnalysisStore:
 
     @staticmethod
     def _link_user(connection: Connection, user_id: str, public_id: str, now: datetime) -> None:
-        existing = connection.execute(
-            select(analysis_user_links.c.public_id).where(
-                analysis_user_links.c.user_id == user_id,
-                analysis_user_links.c.public_id == public_id,
-            )
-        ).scalar_one_or_none()
-        if existing is None:
-            connection.execute(
-                analysis_user_links.insert().values(
-                    user_id=user_id, public_id=public_id, saved_at=now
-                )
-            )
+        values = {"user_id": user_id, "public_id": public_id, "saved_at": now}
+        if connection.dialect.name == "postgresql":
+            postgresql_statement = postgresql_insert(analysis_user_links).values(**values)
+            connection.execute(postgresql_statement.on_conflict_do_nothing())
+            return
+        if connection.dialect.name == "sqlite":
+            sqlite_statement = sqlite_insert(analysis_user_links).values(**values)
+            connection.execute(sqlite_statement.on_conflict_do_nothing())
+            return
+        connection.execute(analysis_user_links.insert().values(**values))
 
     def list_for_user(self, user_id: str) -> list[dict[str, object]]:
         query = (

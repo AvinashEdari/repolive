@@ -1,7 +1,7 @@
 # Local setup
 
-Use Node.js 24+, npm 11+, and Python 3.11+. The existing `.venv` is stale on this workstation;
-create `.venv-local` or use the verified ignored `.venv311` environment.
+Use Node.js 24+, npm 11+, and Python 3.11+. Create `.venv-local`; workstation-specific verification
+environments are ignored and must not be committed.
 
 From the repository root:
 
@@ -27,3 +27,8 @@ cmd /c npm run dev:web
 ```
 
 Open `http://localhost:3000/analyze`. Docker is not required for local verification.
+
+Authentication is optional locally. To exercise it, use a real non-production Supabase project and
+set `SUPABASE_URL` and `SUPABASE_JWT_AUDIENCE` for the API plus
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for the browser. Do not use or expose
+the service-role key. Without those variables, anonymous analysis and public reports remain usable.

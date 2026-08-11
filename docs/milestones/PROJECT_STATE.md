@@ -37,14 +37,21 @@ Last updated: 2026-08-11
 - Responsive SaaS presentation now uses consistent navigation, accessible account controls,
   progressive report sections, expandable score/dependency evidence, explicit partial/cache states,
   display-only command warnings, and a guided machine-compatibility form.
-- Verification: 57 backend tests, 4 frontend interaction tests, migration upgrade/downgrade,
+- Supabase JWT claims are regression-tested with locally signed asymmetric tokens. Authenticated
+  requests no longer consume anonymous allowance, and PostgreSQL/SQLite history linking uses an
+  atomic conflict-safe insert.
+- Production configuration accepts only the supported PostgreSQL driver and exact HTTPS web and
+  Supabase origins. Migration tests verify keys, cache uniqueness, ownership indexes, cascade
+  behavior, downgrade, and offline PostgreSQL DDL generation.
+- Verification: 71 backend tests, 6 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.
 
 ## Planned
 
-- Live Supabase project authentication verification and private repository authorization.
+- Live Supabase/PostgreSQL staging authentication and persistence verification.
+- Private repository authorization.
 - Broader lockfile/version-conflict analysis and README setup-section extraction.
 
 ## Known constraints

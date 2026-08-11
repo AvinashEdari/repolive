@@ -4,7 +4,15 @@ export function getSupabaseClient(): SupabaseClient | null {
   if (client !== undefined) return client;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  client = url && key ? createClient(url, key) : null;
+  client = url && key
+    ? createClient(url, key, {
+        auth: {
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          persistSession: true,
+        },
+      })
+    : null;
   return client;
 }
 export async function getAccessToken(): Promise<string | null> {

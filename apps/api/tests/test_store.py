@@ -1,6 +1,13 @@
 import pytest
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 
-from app.db.store import AnalysisStore, AnonymousLimitExceeded
+from app.db.store import (
+    AnalysisPersistenceError,
+    AnalysisStore,
+    AnonymousLimitExceeded,
+    analyses,
+)
 from app.schemas.analysis import AnalysisReport, DeterministicAnalysis, QualitySignals
 from app.schemas.repository import RepositoryMetadata, RepositoryReference, RepositorySnapshot
 
@@ -80,6 +87,34 @@ def test_authenticated_history_is_private_idempotent_and_removable() -> None:
     assert store.list_for_user("user-a") == []
     assert len(store.list_for_user("user-b")) == 1
     assert store.get(str(first.public_id)) is not None
+
+
+def test_authenticated_analyses_do_not_consume_anonymous_allowance() -> None:
+    store = AnalysisStore("sqlite:///:memory:")
+    store.save(empty_report(), "shared-browser", 1, "user-a")
+    store.save(empty_report(commit_sha="commit-2"), "shared-browser", 1, "user-a")
+
+    anonymous = store.save(empty_report(commit_sha="commit-3"), "shared-browser", 1)
+    assert anonymous.public_id is not None
+    with pytest.raises(AnonymousLimitExceeded):
+        store.save(empty_report(commit_sha="commit-4"), "shared-browser", 1)
+
+
+def test_failed_history_link_rolls_back_the_analysis_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = AnalysisStore("sqlite:///:memory:")
+
+    def fail_link(*args: object) -> None:
+        del args
+        raise SQLAlchemyError("forced failure")
+
+    monkeypatch.setattr(store, "_link_user", fail_link)
+    with pytest.raises(AnalysisPersistenceError):
+        store.save(empty_report(), "browser", 1, "user-a")
+
+    with store.engine.connect() as connection:
+        assert connection.execute(select(func.count()).select_from(analyses)).scalar_one() == 0
 
 
 def test_database_ping_uses_live_connection() -> None:

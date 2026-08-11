@@ -16,6 +16,25 @@ credentials.
    monitoring, TLS, and secret rotation before public launch.
 7. Run backend/frontend suites and a public-repository smoke test in the deployed environment.
 
+## Staging database and authentication validation
+
+Use a dedicated staging project and test account. Never run downgrade validation against production.
+
+1. Give the API and Alembic process the staging `DATABASE_URL`; keep it server-only.
+2. Run `alembic upgrade head`, inspect tables, keys, indexes, and the foreign-key cascade, then
+   exercise create, cached read, history link, history removal, and readiness operations.
+3. If staging data is disposable or backed up, downgrade one revision, verify the expected schema,
+   and immediately upgrade back to `head`.
+4. Configure the browser with only the project URL and anon key. Create a dedicated test user,
+   confirm email if required, and verify sign-up, invalid login, login, token refresh, logout, and
+   invalid/expired-session behavior.
+5. Analyze a small public repository anonymously and while signed in. Verify cache reuse, private
+   history ownership with two test users, and an unauthenticated public share URL.
+6. Remove test accounts and staging records according to the project retention policy.
+
+Record the project, migration revision, test time, and outcomes without recording passwords,
+access tokens, connection strings, or service-role credentials.
+
 ## Recommended staging shape
 
 - Next.js: Vercel project rooted at `apps/web`.
