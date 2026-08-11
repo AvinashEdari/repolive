@@ -34,7 +34,10 @@ Last updated: 2026-08-11
 - Users can compare explicitly supplied OS, architecture, runtime versions, and Docker availability
   with repository evidence. Results are compatible, probably compatible, incompatible, or unknown;
   absent hardware requirements are never guessed.
-- Verification: 57 backend tests, 2 frontend interaction tests, migration upgrade/downgrade,
+- Responsive SaaS presentation now uses consistent navigation, accessible account controls,
+  progressive report sections, expandable score/dependency evidence, explicit partial/cache states,
+  display-only command warnings, and a guided machine-compatibility form.
+- Verification: 57 backend tests, 4 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.

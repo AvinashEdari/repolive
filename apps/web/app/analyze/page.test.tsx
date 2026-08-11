@@ -40,9 +40,24 @@ describe("analysis workspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
     await waitFor(() => expect(screen.getByText("a / b")).toBeTruthy());
     expect(screen.getByText("Python")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Share analysis" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Share report" }).getAttribute("href")).toBe(
       "/analysis/public-id",
     );
+    expect(screen.getByText("Commands are display-only")).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "Report sections" })).toBeTruthy();
+  });
+
+  it("clearly labels cached and partial reports", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ...report, cache_status: "cached", snapshot: { ...report.snapshot, ingestion_warnings: ["README was too large to read."] } }),
+    }));
+    render(<AnalyzePage />);
+    fireEvent.change(screen.getByPlaceholderText("https://github.com/owner/repository"), { target: { value: "https://github.com/a/b" } });
+    fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+    expect(await screen.findByText("Cached report reused")).toBeTruthy();
+    expect(screen.getByText("Partial analysis")).toBeTruthy();
+    expect(screen.getByText("README was too large to read.")).toBeTruthy();
   });
 });
 

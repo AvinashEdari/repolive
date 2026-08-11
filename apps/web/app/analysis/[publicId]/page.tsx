@@ -1,8 +1,10 @@
 import Link from "next/link";
 
-import { Report, Results } from "../../analyze/page";
+import { Report } from "../../analyze/page";
+import { SiteHeader } from "../../components/site-header";
+import { ReportView } from "../../components/report/report-view";
 import styles from "../../analyze/results.module.css";
-import MachineCheck from "./machine-check";
+import { MachineCheckPanel } from "../../components/report/machine-check-panel";
 
 export default async function PublicAnalysisPage({
   params,
@@ -19,5 +21,5 @@ export default async function PublicAnalysisPage({
       <section className={styles.search}><p>ANALYSIS UNAVAILABLE</p><h1>This analysis could not be found.</h1><Link href="/analyze">Analyze a repository</Link></section></main>;
   }
   const report = (await response.json()) as Report;
-  return <main className={styles.shell}><header><Link href="/">RepoLive.</Link><Link href="/analyze">New analysis</Link></header><Results report={report}/><MachineCheck publicId={publicId}/></main>;
+  return <div className={styles.shell}><SiteHeader context="Shared analysis"/><main id="main-content"><ReportView report={report}/><MachineCheckPanel publicId={publicId}/></main></div>;
 }
