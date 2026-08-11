@@ -46,6 +46,7 @@ def test_analysis_request_validates_repository() -> None:
     assert response.status_code == 200
     assert response.json()["snapshot"]["repository"]["canonical_url"] == "https://github.com/openai/openai-python"
     assert response.json()["snapshot"]["files"][0]["path"] == "README.md"
+    assert "text_content" not in response.json()["snapshot"]["files"][0]
     assert response.json()["analysis"]["important_files"][0]["role"] == "Primary documentation"
 
 

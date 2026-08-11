@@ -1,3 +1,5 @@
+import base64
+
 import httpx
 import pytest
 
@@ -91,3 +93,39 @@ async def test_rejects_truncated_tree() -> None:
         github = GitHubRepositoryProvider(Settings(), client)
         with pytest.raises(RepositoryProviderError, match="safe recursive response limit"):
             await github.fetch_snapshot(github.parse_url("https://github.com/openai/openai-python"))
+
+
+@pytest.mark.asyncio
+async def test_fetches_only_allowlisted_bounded_evidence_content() -> None:
+    package = b'{"dependencies":{"react":"^19.0.0"}}'
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/git/trees/main"):
+            return httpx.Response(
+                200,
+                json={
+                    "truncated": False,
+                    "tree": [
+                        {"path": "package.json", "type": "blob", "size": len(package), "sha": "a"},
+                        {"path": "src/app.ts", "type": "blob", "size": 100, "sha": "b"},
+                    ],
+                },
+            )
+        if request.url.path == "/repos/a/b/git/blobs/a":
+            return httpx.Response(
+                200,
+                json={
+                    "encoding": "base64",
+                    "content": f"{base64.b64encode(package).decode()}\n",
+                },
+            )
+        return httpx.Response(200, json={"default_branch": "main"})
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(respond), base_url="https://api.github.com"
+    ) as client:
+        github = GitHubRepositoryProvider(Settings(), client)
+        result = await github.fetch_snapshot(github.parse_url("https://github.com/a/b"))
+
+    assert result.files[0].text_content == package.decode()
+    assert result.files[1].text_content is None

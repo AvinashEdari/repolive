@@ -81,3 +81,28 @@ def test_unknown_repository_gets_honest_generic_project_type() -> None:
     assert report.analysis.project_types == ["General software repository"]
     assert report.analysis.languages == []
     assert report.analysis.important_files[0].role == "Primary documentation"
+
+
+def test_manifest_contents_drive_dependencies_frameworks_runtimes_and_scores() -> None:
+    report = AnalysisPipeline().analyze(
+        snapshot(
+            [
+                RepositoryFile(
+                    path="package.json",
+                    text_content='{"engines":{"node":">=22"},"dependencies":{"react":"^19"}}',
+                ),
+                RepositoryFile(path="README.md"),
+                RepositoryFile(path="LICENSE"),
+                RepositoryFile(path="tests/app.test.ts"),
+                RepositoryFile(path=".github/workflows/test.yml"),
+                RepositoryFile(path="Dockerfile"),
+                RepositoryFile(path=".env.example"),
+            ]
+        )
+    )
+
+    assert report.analysis.dependencies[0].name == "react"
+    assert any(item.name == "React" for item in report.analysis.technologies)
+    assert report.analysis.runtimes[0].version_constraint == ">=22"
+    assert report.analysis.quality.has_tests is True
+    assert {score.value for score in report.analysis.scores} == {100}

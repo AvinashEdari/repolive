@@ -1,6 +1,8 @@
 # RepoLive
 
-RepoLive turns public source repositories into evidence-based, beginner-friendly technical reports. This clean rebuild currently validates GitHub URLs and ingests bounded public repository metadata and file trees through GitHub's API; it does not execute repository code.
+RepoLive turns public source repositories into evidence-based, beginner-friendly technical reports. It validates GitHub URLs, ingests bounded public metadata and allowlisted textual evidence, and deterministically reports languages, dependencies, runtimes, tooling, important files, quality signals, and explainable scores. It does not execute repository code.
+
+The product shell is available at `/`; the full analysis workspace is available at `/analyze`.
 
 ## Local development
 

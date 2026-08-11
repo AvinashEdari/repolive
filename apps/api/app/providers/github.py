@@ -1,4 +1,6 @@
+import base64
 import re
+from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
 import httpx
@@ -13,6 +15,24 @@ from app.schemas.repository import (
 )
 
 _SEGMENT = re.compile(r"^[A-Za-z0-9_.-]+$")
+_EVIDENCE_NAMES = {
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "pipfile",
+    "cargo.toml",
+    "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "compose.yml",
+    "compose.yaml",
+    ".env.example",
+    "makefile",
+}
 
 
 class GitHubRepositoryProvider(RepositoryProvider):
@@ -82,7 +102,11 @@ class GitHubRepositoryProvider(RepositoryProvider):
                 )
 
             files = [
-                RepositoryFile(path=item["path"], size_bytes=item.get("size"))
+                RepositoryFile(
+                    path=item["path"],
+                    size_bytes=item.get("size"),
+                    content_id=item.get("sha"),
+                )
                 for item in tree_payload.get("tree", [])
                 if item.get("type") == "blob" and isinstance(item.get("path"), str)
             ]
@@ -91,6 +115,8 @@ class GitHubRepositoryProvider(RepositoryProvider):
             known_bytes = sum(item.size_bytes or 0 for item in files)
             if known_bytes > self.settings.max_repository_bytes:
                 raise RepositoryProviderError("Repository exceeds the configured size limit.")
+
+            await self._hydrate_evidence_files(client, repository, files)
 
             license_data = metadata_payload.get("license") or {}
             return RepositorySnapshot(
@@ -127,3 +153,52 @@ class GitHubRepositoryProvider(RepositoryProvider):
             raise RepositoryProviderError("GitHub rate limit or access policy blocked the request.")
         if response.is_error:
             raise RepositoryProviderError("GitHub returned an unexpected error.")
+
+    async def _hydrate_evidence_files(
+        self,
+        client: httpx.AsyncClient,
+        repository: RepositoryReference,
+        files: list[RepositoryFile],
+    ) -> None:
+        eligible = [file for file in files if self._is_evidence_file(file)]
+        if len(eligible) > self.settings.max_evidence_files:
+            eligible = eligible[: self.settings.max_evidence_files]
+
+        total_bytes = 0
+        for file in eligible:
+            if not file.content_id:
+                continue
+            response = await client.get(
+                f"/repos/{repository.owner}/{repository.name}/git/blobs/{file.content_id}"
+            )
+            self._raise_for_status(response)
+            payload = response.json()
+            if payload.get("encoding") != "base64" or not isinstance(payload.get("content"), str):
+                raise RepositoryProviderError("GitHub returned an invalid evidence file.")
+            try:
+                encoded = "".join(payload["content"].split())
+                raw = base64.b64decode(encoded, validate=True)
+            except ValueError as exc:
+                raise RepositoryProviderError("GitHub returned invalid base64 evidence.") from exc
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            if len(raw) > self.settings.max_evidence_file_bytes:
+                continue
+            total_bytes += len(raw)
+            if total_bytes > self.settings.max_evidence_total_bytes:
+                break
+            file.text_content = text
+
+    def _is_evidence_file(self, file: RepositoryFile) -> bool:
+        if file.size_bytes is not None and file.size_bytes > self.settings.max_evidence_file_bytes:
+            return False
+        path = PurePosixPath(file.path)
+        name = path.name.lower()
+        return (
+            name in _EVIDENCE_NAMES
+            or name == "readme"
+            or name.startswith("readme.")
+            or file.path.lower().startswith(".github/workflows/")
+        )

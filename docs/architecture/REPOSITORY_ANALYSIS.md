@@ -21,10 +21,20 @@ tools, containers, and CI workflows. Every finding retains concrete file-path ev
 The API returns the original immutable snapshot beside the deterministic findings. Unknown
 repositories receive an honest generic project type rather than a guessed application category.
 
+## Implemented bounded evidence analysis
+
+The provider fetches recognized manifests, README files, environment templates, and CI workflows
+by immutable Git blob ID. File count, per-file bytes, aggregate evidence bytes, base64, and UTF-8
+are bounded or validated. Evidence contents are analyzer-internal and excluded from API output.
+
+Parsers currently support npm `package.json`, Python `requirements.txt`, PEP 621
+`pyproject.toml`, Node/Python/Go/Rust runtime signals, dependency-backed framework detection,
+documentation/testing/CI/container signals, and two explainable score categories.
+
 ## Next pipeline milestone
 
-Ingest a strictly allowlisted, size-bounded set of textual manifests. Dependency, framework,
-documentation, test, CI, and runtime analyzers can then parse file contents without cloning or
-executing the repository.
+Add persistent analysis records and stable public IDs before enabling shareable analysis routes.
+Then expand parsers for Cargo, Go, Maven, and Gradle dependencies and produce evidence-based
+OS-specific setup steps.
 
 Pipeline: validation, provider retrieval, bounded ingestion, deterministic analyzers, explainable scoring, persistence, and presentation. Facts retain evidence and confidence.

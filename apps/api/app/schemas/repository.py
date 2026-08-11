@@ -31,6 +31,8 @@ class RepositoryMetadata(BaseModel):
 class RepositoryFile(BaseModel):
     path: str
     size_bytes: int | None = Field(default=None, ge=0)
+    content_id: str | None = Field(default=None, exclude=True)
+    text_content: str | None = Field(default=None, exclude=True)
 
 
 class RepositorySnapshot(BaseModel):

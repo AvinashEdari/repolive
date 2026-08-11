@@ -1,6 +1,12 @@
+from app.analysis.dependencies import (
+    DependencyAnalyzer,
+    FrameworkDependencyAnalyzer,
+    RuntimeAnalyzer,
+)
 from app.analysis.languages import LanguageAnalyzer
+from app.analysis.quality import QualityAnalyzer, ScoreAnalyzer
 from app.analysis.structure import ImportantFileAnalyzer, TechnologyAnalyzer
-from app.schemas.analysis import AnalysisReport, DeterministicAnalysis
+from app.schemas.analysis import AnalysisReport, DeterministicAnalysis, TechnologyFinding
 from app.schemas.repository import RepositorySnapshot
 
 
@@ -9,9 +15,19 @@ class AnalysisPipeline:
         self.language_analyzer = LanguageAnalyzer()
         self.technology_analyzer = TechnologyAnalyzer()
         self.important_file_analyzer = ImportantFileAnalyzer()
+        self.dependency_analyzer = DependencyAnalyzer()
+        self.runtime_analyzer = RuntimeAnalyzer()
+        self.framework_dependency_analyzer = FrameworkDependencyAnalyzer()
+        self.quality_analyzer = QualityAnalyzer()
+        self.score_analyzer = ScoreAnalyzer()
 
     def analyze(self, snapshot: RepositorySnapshot) -> AnalysisReport:
-        technologies = self.technology_analyzer.analyze(snapshot)
+        dependencies = self.dependency_analyzer.analyze(snapshot)
+        technologies = self._merge_technologies(
+            self.technology_analyzer.analyze(snapshot),
+            self.framework_dependency_analyzer.analyze(dependencies),
+        )
+        quality = self.quality_analyzer.analyze(snapshot)
         project_types = self._project_types(snapshot, {item.name for item in technologies})
         return AnalysisReport(
             snapshot=snapshot,
@@ -20,6 +36,10 @@ class AnalysisPipeline:
                 technologies=technologies,
                 important_files=self.important_file_analyzer.analyze(snapshot),
                 project_types=project_types,
+                dependencies=dependencies,
+                runtimes=self.runtime_analyzer.analyze(snapshot),
+                quality=quality,
+                scores=self.score_analyzer.analyze(quality),
             ),
         )
 
@@ -36,3 +56,18 @@ class AnalysisPipeline:
         if not types:
             types.append("General software repository")
         return types
+
+    @staticmethod
+    def _merge_technologies(
+        *groups: list[TechnologyFinding],
+    ) -> list[TechnologyFinding]:
+        merged: dict[tuple[str, str], TechnologyFinding] = {}
+        for group in groups:
+            for item in group:
+                key = (item.name, item.category)
+                existing = merged.get(key)
+                if existing:
+                    existing.evidence = sorted(set(existing.evidence + item.evidence))
+                else:
+                    merged[key] = item
+        return sorted(merged.values(), key=lambda item: (item.category, item.name))

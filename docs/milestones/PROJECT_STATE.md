@@ -11,14 +11,17 @@ Last updated: 2026-08-10
   explicit not-found, rate-limit, truncation, file-count, and known-byte limit failures.
 - Composable deterministic pipeline for language distribution, important files, technology
   markers, and evidence-backed project types.
-- Verification: 16 backend tests, Python lint and strict typing, frontend lint and typing,
+- Bounded allowlisted evidence-file hydration by Git blob ID; raw contents are never returned.
+- Dependency parsing for npm and Python, runtime constraints, dependency-backed frameworks,
+  documentation/test/CI/container signals, and explainable documentation/readiness scores.
+- Responsive real-results workspace at `/analyze`.
+- Verification: 18 backend tests, Python lint and strict typing, frontend lint and typing,
   and the Next.js production build.
 
 ## Planned
 
-- Bounded manifest-content ingestion and dependency/framework/runtime analyzers.
-- Real results UI, scoring, persistence, shareable results, usage limits, authentication,
-  compatibility, and setup guidance.
+- Persistence, shareable results, usage limits, authentication, compatibility, and setup guidance.
+- Cargo, Go, Maven, and Gradle dependency parsers and broader framework/runtime coverage.
 
 ## Known constraints
 
@@ -27,3 +30,5 @@ Last updated: 2026-08-10
   is unset.
 - A stale `.venv` references a removed Python installation. Verification currently uses the
   ignored `.venv311` project environment; neither environment is committed.
+- Legacy landing-page source files are owned by an inaccessible prior sandbox identity. The new
+  results workspace was added as `/analyze`; linking it from `/` remains blocked by that ACL.

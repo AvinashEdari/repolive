@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from app.schemas.repository import RepositorySnapshot
 
 TechnologyCategory = Literal["framework", "build_tool", "infrastructure", "package_manager"]
+DependencyScope = Literal["runtime", "development", "optional", "unknown"]
 
 
 class LanguageFinding(BaseModel):
@@ -27,11 +28,50 @@ class ImportantFileFinding(BaseModel):
     role: str
 
 
+class DependencyFinding(BaseModel):
+    name: str
+    version_constraint: str | None
+    scope: DependencyScope
+    ecosystem: str
+    source_path: str
+
+
+class RuntimeFinding(BaseModel):
+    runtime: str
+    version_constraint: str | None
+    evidence: list[str]
+
+
+class QualitySignals(BaseModel):
+    has_readme: bool
+    has_license: bool
+    has_tests: bool
+    has_ci: bool
+    has_container_config: bool
+    has_environment_example: bool
+
+
+class ScoreFactor(BaseModel):
+    label: str
+    impact: Literal["positive", "negative", "neutral"]
+    evidence: list[str]
+
+
+class ExplainableScore(BaseModel):
+    name: str
+    value: int = Field(ge=0, le=100)
+    factors: list[ScoreFactor]
+
+
 class DeterministicAnalysis(BaseModel):
     languages: list[LanguageFinding]
     technologies: list[TechnologyFinding]
     important_files: list[ImportantFileFinding]
     project_types: list[str]
+    dependencies: list[DependencyFinding]
+    runtimes: list[RuntimeFinding]
+    quality: QualitySignals
+    scores: list[ExplainableScore]
 
 
 class AnalysisReport(BaseModel):
