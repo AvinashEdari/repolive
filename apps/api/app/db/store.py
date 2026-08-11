@@ -1,6 +1,7 @@
 import json
 import secrets
 from datetime import UTC, datetime
+from functools import lru_cache
 
 from sqlalchemy import (
     Column,
@@ -15,8 +16,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.sql import select
+from sqlalchemy.sql import select, text
 
+from app.core.config import get_settings
 from app.schemas.analysis import AnalysisReport
 
 metadata = MetaData()
@@ -59,14 +61,36 @@ class AnalysisPersistenceError(RuntimeError):
 
 
 class AnalysisStore:
-    def __init__(self, database_url: str, create_schema: bool = True) -> None:
-        connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
+    def __init__(
+        self,
+        database_url: str,
+        create_schema: bool = True,
+        pool_size: int = 5,
+        max_overflow: int = 5,
+        pool_timeout: int = 10,
+        pool_recycle: int = 300,
+        connect_timeout: int = 10,
+    ) -> None:
+        is_sqlite = database_url.startswith("sqlite")
+        connect_args = (
+            {"check_same_thread": False, "timeout": connect_timeout}
+            if is_sqlite
+            else {"connect_timeout": connect_timeout}
+        )
         if database_url == "sqlite:///:memory:":
             self.engine = create_engine(
                 database_url, connect_args=connect_args, poolclass=StaticPool
             )
         else:
-            self.engine = create_engine(database_url, connect_args=connect_args)
+            self.engine = create_engine(
+                database_url,
+                connect_args=connect_args,
+                pool_pre_ping=True,
+                pool_size=pool_size,
+                max_overflow=max_overflow,
+                pool_timeout=pool_timeout,
+                pool_recycle=pool_recycle,
+            )
         if create_schema:
             metadata.create_all(self.engine)
 
@@ -130,6 +154,13 @@ class AnalysisStore:
             return None
         return AnalysisReport.model_validate(json.loads(serialized))
 
+    def ping(self) -> None:
+        try:
+            with self.engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except SQLAlchemyError as exc:
+            raise AnalysisPersistenceError("Database readiness check failed.") from exc
+
     @staticmethod
     def _identity(report: AnalysisReport) -> dict[str, str]:
         repository = report.snapshot.repository
@@ -140,3 +171,17 @@ class AnalysisStore:
             "commit_sha": report.snapshot.metadata.commit_sha,
             "analysis_version": report.analysis_version,
         }
+
+
+@lru_cache
+def get_analysis_store() -> AnalysisStore:
+    settings = get_settings()
+    return AnalysisStore(
+        settings.database_url,
+        create_schema=settings.app_env != "production",
+        pool_size=settings.database_pool_size,
+        max_overflow=settings.database_max_overflow,
+        pool_timeout=settings.database_pool_timeout_seconds,
+        pool_recycle=settings.database_pool_recycle_seconds,
+        connect_timeout=settings.database_connect_timeout_seconds,
+    )

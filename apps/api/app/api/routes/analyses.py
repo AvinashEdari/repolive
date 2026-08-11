@@ -1,12 +1,16 @@
 import secrets
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.analysis.pipeline import AnalysisPipeline
 from app.core.config import get_settings
-from app.db.store import AnalysisPersistenceError, AnalysisStore, AnonymousLimitExceeded
+from app.db.store import (
+    AnalysisPersistenceError,
+    AnalysisStore,
+    AnonymousLimitExceeded,
+    get_analysis_store,
+)
 from app.providers.base import (
     InvalidRepositoryUrl,
     RepositoryConnectivityError,
@@ -25,12 +29,6 @@ router = APIRouter(prefix="/analyses", tags=["analyses"])
 
 def get_repository_provider() -> RepositoryProvider:
     return GitHubRepositoryProvider()
-
-
-@lru_cache
-def get_analysis_store() -> AnalysisStore:
-    settings = get_settings()
-    return AnalysisStore(settings.database_url, create_schema=settings.app_env != "production")
 
 
 @router.post("", response_model=AnalysisReport, status_code=status.HTTP_200_OK)

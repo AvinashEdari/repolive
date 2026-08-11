@@ -14,6 +14,27 @@ credentials.
    monitoring, TLS, and secret rotation before public launch.
 7. Run backend/frontend suites and a public-repository smoke test in the deployed environment.
 
+## Recommended staging shape
+
+- Next.js: Vercel project rooted at `apps/web`.
+- FastAPI: Render web service using the checked-in `render.yaml`.
+- Database: Supabase PostgreSQL direct/server connection string with TLS required.
+
+The API exposes `/api/v1/health/live` for process liveness and `/api/v1/health/ready` for a real
+database `SELECT 1` readiness check. Production uses pre-ping, bounded overflow, connection wait,
+connect timeout, and connection recycling. Migration processes use a one-shot non-pooled
+connection.
+
+## Backup and restore
+
+Enable managed daily backups and point-in-time recovery when the selected database plan supports
+them. Before a schema migration, confirm a recent restorable backup. Test restoration into a
+separate staging project; never test restores over production. Keep database credentials and
+backup artifacts out of Git and application logs.
+
+Rollback application code independently from schema. Run Alembic downgrade only for migrations
+whose downgrade has been explicitly tested and whose data-loss implications are acceptable.
+
 Supabase Auth, private repository access, billing, and arbitrary repository execution are not part
 of the deployed MVP boundary. Future execution requires a separate threat-modeled sandbox service;
 the API host must never execute repository commands or expose a Docker socket.

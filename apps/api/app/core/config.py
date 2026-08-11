@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     web_origin: str = "http://localhost:3000"
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     database_url: str = "sqlite:///./repolive.db"
+    database_pool_size: int = Field(default=5, ge=1, le=50)
+    database_max_overflow: int = Field(default=5, ge=0, le=100)
+    database_pool_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    database_pool_recycle_seconds: int = Field(default=300, ge=30, le=3600)
+    database_connect_timeout_seconds: int = Field(default=10, ge=1, le=60)
     analysis_version: str = "1"
     github_token: str | None = None
     github_request_timeout_seconds: float = Field(default=15.0, gt=0, le=60)

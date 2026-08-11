@@ -63,3 +63,36 @@ def test_analysis_version_invalidates_cached_report() -> None:
     first = store.save(empty_report(version="1"), "browser", 2)
     second = store.save(empty_report(version="2"), "browser", 2)
     assert first.public_id != second.public_id
+
+
+def test_database_ping_uses_live_connection() -> None:
+    store = AnalysisStore("sqlite:///:memory:")
+    store.ping()
+
+
+def test_postgres_engine_uses_bounded_healthy_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+    sentinel = object()
+
+    def fake_create_engine(url: str, **options: object) -> object:
+        captured["url"] = url
+        captured.update(options)
+        return sentinel
+
+    monkeypatch.setattr("app.db.store.create_engine", fake_create_engine)
+    store = AnalysisStore(
+        "postgresql+psycopg://user:secret@db.example/repolive",
+        create_schema=False,
+        pool_size=7,
+        max_overflow=3,
+        pool_timeout=9,
+        pool_recycle=240,
+        connect_timeout=8,
+    )
+    assert store.engine is sentinel
+    assert captured["pool_pre_ping"] is True
+    assert captured["pool_size"] == 7
+    assert captured["max_overflow"] == 3
+    assert captured["pool_timeout"] == 9
+    assert captured["pool_recycle"] == 240
+    assert captured["connect_args"] == {"connect_timeout": 8}

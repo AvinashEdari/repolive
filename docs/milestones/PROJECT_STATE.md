@@ -25,7 +25,9 @@ Last updated: 2026-08-11
   and installed PostgreSQL/Supabase driver boundary.
 - Typed provider failures, partial evidence warnings, security headers, trusted hosts, request
   size/time limits, strict production configuration, and a disabled explanation-provider path.
-- Verification: 51 backend tests, 2 frontend interaction tests, migration upgrade/downgrade,
+- PostgreSQL staging readiness includes bounded/pre-ping connection pooling, connect/wait/recycle
+  timeouts, database readiness probes, a Render blueprint, and explicit backup/restore guidance.
+- Verification: 53 backend tests, 2 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.
