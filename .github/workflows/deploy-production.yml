@@ -1,0 +1,22 @@
+name: Approve production release
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Verified commit SHA to release
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  production-gate:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+      - name: Record approved release
+        run: echo "Production release approved for $(git rev-parse HEAD). Provider deployment remains separately controlled."

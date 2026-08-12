@@ -23,6 +23,7 @@
   limits.
 - `MAX_EVIDENCE_FILES`, `MAX_EVIDENCE_FILE_BYTES`, `MAX_EVIDENCE_TOTAL_BYTES`: allowlisted text limits.
 - `NEXT_PUBLIC_API_URL`: browser-visible API base URL; it must never contain credentials.
+- `NEXT_PUBLIC_SITE_URL`: canonical public frontend origin used for metadata, robots, and sitemap.
 
 No AI environment variable is required. The explanation provider is disabled by default.
 

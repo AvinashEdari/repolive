@@ -1,0 +1,39 @@
+name: Deploy staging
+
+on:
+  workflow_run:
+    workflows: [Verification]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: true
+
+jobs:
+  render:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      RENDER_STAGING_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}
+    steps:
+      - name: Trigger verified Render deployment
+        if: env.RENDER_STAGING_DEPLOY_HOOK != ''
+        run: curl --fail --silent --show-error --request POST "$RENDER_STAGING_DEPLOY_HOOK"
+      - name: Explain unconfigured deployment hook
+        if: env.RENDER_STAGING_DEPLOY_HOOK == ''
+        run: echo "Render deploy hook is not configured; verified source is not deployed by this workflow."
+
+  vercel:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Vercel deploys main through its protected Git integration after checks pass."

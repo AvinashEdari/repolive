@@ -1,0 +1,5 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { LegalPage } from "../../components/legal-page";
+export const metadata: Metadata = { title: "Contact", description: "How to contact the RepoLive project.", alternates: { canonical: "/legal/contact" } };
+export default function ContactPage() { return <LegalPage title="Contact" summary="Choose a contact path that matches your request."><h2>Product questions and defects</h2><p>Use the <Link href="https://github.com/AvinashEdari/repolive">RepoLive GitHub repository</Link> for non-sensitive project questions and reproducible defects.</p><h2>Security reports</h2><p>Follow the private reporting instructions in the project security policy. Never post credentials, tokens, private data, or exploit details in a public issue.</p><h2>Privacy and legal requests</h2><p>A dedicated production contact address and response process must be published before public launch. Until then, contact the repository owner privately through GitHub.</p></LegalPage>; }

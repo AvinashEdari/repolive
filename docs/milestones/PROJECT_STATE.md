@@ -63,6 +63,10 @@ Last updated: 2026-08-11
   and authenticated new-analysis allowances while keeping cached results reusable.
 - Security reporting, privacy/retention boundaries, and a production hardening checklist are
   documented. Security regression coverage is included in the 89-test backend suite.
+- Stage 6 adds secret-safe GitHub Actions verification and gated deployment workflows, structured
+  request/analysis observability, canonical and social metadata, robots and sitemap routes, public
+  analysis metadata, draft Privacy/Terms/Security/Acceptable Use/Contact pages, and testing,
+  troubleshooting, backup/restore, rollback, and incident runbooks.
 
 ## Planned
 

@@ -8,6 +8,7 @@ from jwt import PyJWKClient
 from jwt.exceptions import PyJWTError
 
 from app.core.config import Settings, get_settings
+from app.observability import log_event
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class SupabaseTokenVerifier:
                 options={"require": ["exp", "iat", "sub"]},
             )
         except PyJWTError as exc:
+            log_event("authentication_failed", reason="invalid_or_expired_token", status=401)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired access token.",
@@ -72,6 +74,7 @@ def get_optional_user(
         return None
     scheme, separator, token = authorization.partition(" ")
     if separator != " " or scheme.lower() != "bearer" or not token:
+        log_event("authentication_failed", reason="malformed_authorization", status=401)
         raise HTTPException(status_code=401, detail="A valid Bearer token is required.")
     return verifier.verify(token)
 

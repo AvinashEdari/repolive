@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 from typing import Annotated
@@ -15,6 +16,7 @@ from app.db.store import (
     AuthenticatedLimitExceeded,
     get_analysis_store,
 )
+from app.observability import log_event
 from app.providers.base import (
     InvalidRepositoryUrl,
     RepositoryConnectivityError,
@@ -53,15 +55,25 @@ async def request_analysis(
     try:
         snapshot = await provider.fetch_snapshot(repository)
     except RepositoryNotFoundError as exc:
+        log_event("github_provider_failure", reason="not_found", status=404)
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RepositoryRateLimitError as exc:
+        log_event(
+            "github_provider_failure",
+            reason="rate_limited",
+            status=429,
+            retry_after_seconds=exc.retry_after_seconds,
+        )
         headers = {"Retry-After": str(exc.retry_after_seconds)} if exc.retry_after_seconds else None
         raise HTTPException(status_code=429, detail=str(exc), headers=headers) from exc
     except RepositoryTooLargeError as exc:
+        log_event("github_provider_failure", reason="repository_too_large", status=413)
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except RepositoryConnectivityError as exc:
+        log_event("github_provider_failure", reason="connectivity", status=504)
         raise HTTPException(status_code=504, detail=str(exc)) from exc
     except RepositoryProviderError as exc:
+        log_event("github_provider_failure", reason="provider_error", status=502)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     report = (
         AnalysisPipeline()
@@ -81,11 +93,13 @@ async def request_analysis(
             get_settings().free_authenticated_analysis_limit,
         )
     except AnonymousLimitExceeded as exc:
+        log_event("quota_exceeded", identity_type="anonymous", status=429)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Anonymous analysis allowance exhausted.",
         ) from exc
     except AuthenticatedLimitExceeded as exc:
+        log_event("quota_exceeded", identity_type="authenticated", status=429)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=(
@@ -93,6 +107,7 @@ async def request_analysis(
             ),
         ) from exc
     except AnalysisPersistenceError as exc:
+        log_event("database_failure", level=logging.ERROR, operation="save_analysis", status=503)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Analysis completed but could not be persisted. Please retry.",
@@ -104,6 +119,14 @@ async def request_analysis(
         secure=get_settings().app_env == "production",
         samesite="lax",
         max_age=60 * 60 * 24 * 365,
+    )
+    log_event(
+        "analysis_completed",
+        analysis_id=stored_report.public_id,
+        cache_status=stored_report.cache_status,
+        authenticated=user is not None,
+        repository_provider=stored_report.snapshot.repository.provider,
+        file_count=len(stored_report.snapshot.files),
     )
     return stored_report
 

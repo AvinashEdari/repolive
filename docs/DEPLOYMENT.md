@@ -111,6 +111,7 @@ checked-in Blueprint intentionally contains names and safe defaults only.
 | `NEXT_PUBLIC_API_URL` | Public frontend | Yes | Exact Render HTTPS origin, no trailing path |
 | `NEXT_PUBLIC_SUPABASE_URL` | Public frontend | Yes for auth | Exact Supabase project HTTPS origin |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public frontend | Yes for auth | Supabase anon/publishable key |
+| `NEXT_PUBLIC_SITE_URL` | Public frontend | Yes | Exact canonical Vercel HTTPS origin |
 
 Only `NEXT_PUBLIC_*` variables are referenced by frontend source. Never add `DATABASE_URL`,
 `GITHUB_TOKEN`, a service-role key, or any backend token to Vercel.
@@ -141,9 +142,17 @@ backup artifacts out of Git and application logs.
 Rollback application code independently from schema. Run Alembic downgrade only for migrations
 whose downgrade has been explicitly tested and whose data-loss implications are acceptable.
 
-Supabase Auth and private history are code complete but require a real project before live
-verification. The API validates token issuer, audience, signature, expiry, and subject against
+Supabase Auth and private history are live-verified in staging. The API validates token issuer,
+audience, signature, expiry, and subject against
 Supabase's rotating public keys; it does not receive passwords. Private repository access, billing,
 and arbitrary repository execution are not part of this boundary. Future execution requires a
 separate threat-modeled sandbox service; the API host must never execute repository commands or
 expose a Docker socket.
+
+## CI/CD controls
+
+GitHub Actions runs independent backend and frontend verification with dependency caches and
+cancels superseded runs. Pull-request jobs receive no production secrets. The staging workflow can
+use the protected `RENDER_STAGING_DEPLOY_HOOK` environment secret only after successful `main`
+verification. Vercel uses its protected Git integration. Production is a separate manually
+dispatched, environment-approved gate and does not automatically reuse staging credentials.
