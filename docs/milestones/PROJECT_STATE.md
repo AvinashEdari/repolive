@@ -46,7 +46,7 @@ Last updated: 2026-08-12
 - The Render Blueprint now declares the full production pool, authentication, request, evidence,
   and quota configuration. Deployment documentation defines exact Supabase, Render, and Vercel
   variable boundaries and staging smoke-test requirements.
-- Verification: 126 backend tests, 10 frontend interaction tests, migration upgrade/downgrade,
+- Verification: 131 backend tests, 12 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.
@@ -90,8 +90,9 @@ Last updated: 2026-08-12
   is unset.
 - Historical virtual environments reference removed Python installations. Verification uses the
   ignored `.venv-verify` Python 3.11 environment; environments are not committed.
-- Legacy landing-page source files are owned by an inaccessible prior sandbox identity. The new
-  results workspace was added as `/analyze`; linking it from `/` remains blocked by that ACL.
+- Legacy landing-page source files are owned by an inaccessible prior sandbox identity. Until that
+  file can be replaced by its owner, the tracked Next.js configuration safely redirects `/` to the
+  production `/analyze` workspace.
 - Supabase PostgreSQL, Supabase Auth, Render, and Vercel are configured and verified for staging.
 - Cookie quotas deter ordinary anonymous overuse but require distributed IP/risk controls for
   production abuse resistance.

@@ -9,6 +9,15 @@ A public paid launch and private-repository launch are **not approved yet** beca
 GitHub App, distributed edge protection, external monitoring, backup/restore drills, and
 professional legal review still require real external configuration and verification.
 
+Launch classification:
+
+- Controlled public-repository staging: **READY AND VERIFIED**.
+- Public free production: **NOT YET APPROVED** pending distributed abuse controls, monitoring,
+  scheduled retention, restore drill, and final production-domain validation.
+- Paid production: **NOT READY**; Stripe is intentionally unconfigured in staging.
+- Private-repository production: **NOT READY**; the GitHub App integration remains disabled until
+  live authorization and isolation testing is complete.
+
 Arbitrary repository execution remains disabled. RepoLive does not clone repositories, run
 repository commands, or install repository dependencies.
 
@@ -23,6 +32,26 @@ repository commands, or install repository dependencies.
   and evidence, authorization-scoped history, safe serialization, and secret-safe logs.
 - Operations: gated CI/CD, health/readiness endpoints, structured request IDs, rollback and incident
   procedures, privacy/retention boundaries, and draft legal pages.
+
+## Final resolution verification
+
+- 131 backend tests pass, including security, authorization, quota, billing, retention, and
+  fail-closed visibility regressions.
+- Ruff lint, Ruff formatting, and strict mypy pass.
+- Alembic upgrades through `0005_analysis_visibility`, downgrades to base, and upgrades back to head
+  on a disposable database.
+- 12 frontend interaction tests, ESLint, TypeScript, and the Next.js production build pass.
+- `npm audit --audit-level=high` reports zero vulnerabilities.
+- Live staging readiness reports PostgreSQL `ok`; public GitHub analysis, commit-SHA cache reuse,
+  public sharing, compatibility, deterministic diagnosis, comparison, and discovery succeed.
+- Exact-origin CORS succeeds for the Vercel origin and is absent for a hostile origin. HSTS,
+  clickjacking protection, MIME sniffing protection, unauthenticated history/admin denial, API
+  `no-store`, and absence of raw evidence in responses were verified.
+- Billing status truthfully reports Stripe as unconfigured. No paid or private-repository capability
+  is represented as live.
+
+The final code resolution was pushed on `main` as `65cdff9`; this report is maintained in the
+subsequent documentation commit recorded by Git history.
 
 ## Stage 8 architecture
 

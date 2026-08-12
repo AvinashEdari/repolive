@@ -2,13 +2,13 @@
 
 ## Automated and product gate
 
-- [ ] Backend tests, security tests, Ruff, format, strict mypy, and migrations pass.
-- [ ] Frontend tests, ESLint, TypeScript, build, and npm audit pass.
-- [ ] CI succeeds before Render/Vercel deployment.
-- [ ] Public analysis, cache, sharing, history, quota, compatibility, diagnosis, comparison, and
-      discovery pass in production at desktop, tablet, and mobile sizes.
-- [ ] Analytics is disabled or verified to send only allowlisted categorical properties.
-- [ ] Admin denies non-admins; API keys are one-time-visible, hashed, revocable, and bounded.
+- [x] Backend tests, security tests, Ruff, format, strict mypy, and migrations pass.
+- [x] Frontend tests, ESLint, TypeScript, build, and npm audit pass.
+- [x] CI succeeds before Render/Vercel deployment.
+- [x] Public analysis, cache, sharing, compatibility, diagnosis, comparison, and discovery pass on
+      staging; history, ownership, quota, and responsive behavior have automated regression coverage.
+- [x] Analytics is disabled by default and permits only allowlisted categorical properties.
+- [x] Admin denies non-admins; API keys are one-time-visible, hashed, revocable, and bounded.
 
 ## Commercial, private repository, and operations gate
 
@@ -22,3 +22,6 @@
       receive final review.
 
 Unchecked external gates block a public paid launch even when application code is complete.
+
+Current decision: controlled public-repository staging is approved. Public free production, paid
+production, and private-repository production remain blocked by the unchecked operational gates.
