@@ -65,6 +65,56 @@ async def test_rejects_unsafe_repository_paths() -> None:
             )
 
 
+@pytest.mark.asyncio
+async def test_search_uses_one_official_api_call_and_transparent_ranking() -> None:
+    requests: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "full_name": "owner/relevant",
+                        "description": "fastapi starter",
+                        "language": "Python",
+                        "topics": ["fastapi"],
+                        "stargazers_count": 5,
+                        "updated_at": "2026-08-01T12:00:00Z",
+                        "license": {"spdx_id": "MIT"},
+                        "archived": False,
+                        "fork": False,
+                    },
+                    {
+                        "full_name": "owner/popular",
+                        "description": "unrelated",
+                        "language": "Python",
+                        "topics": [],
+                        "stargazers_count": 1_000_000,
+                        "updated_at": "2026-08-01T12:00:00Z",
+                        "license": None,
+                        "archived": False,
+                        "fork": False,
+                    },
+                ]
+            },
+        )
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(respond), base_url="https://api.github.com"
+    ) as client:
+        results = await GitHubRepositoryProvider(Settings(), client).search_repositories(
+            "topic:fastapi language:Python fastapi", 2
+        )
+
+    assert len(requests) == 1
+    assert requests[0].url.path == "/search/repositories"
+    assert results[0].full_name == "owner/relevant"
+    assert results[0].ranking_reasons
+    assert results[0].url == "https://github.com/owner/relevant"
+
+
 def test_rate_limit_retry_after_is_bounded() -> None:
     response = httpx.Response(429, headers={"retry-after": "99999"})
     with pytest.raises(RepositoryRateLimitError) as caught:

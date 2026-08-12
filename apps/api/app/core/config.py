@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     github_request_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
     free_anonymous_analysis_limit: int = Field(default=5, ge=1, le=100)
     free_authenticated_analysis_limit: int = Field(default=50, ge=1, le=10_000)
-    max_request_body_bytes: int = Field(default=4096, ge=512, le=1024 * 1024)
+    max_request_body_bytes: int = Field(default=24_576, ge=512, le=1024 * 1024)
     max_repository_files: int = Field(default=10_000, ge=1)
     max_repository_bytes: int = Field(default=100 * 1024 * 1024, ge=1)
     max_repository_path_bytes: int = Field(default=1024, ge=64, le=4096)

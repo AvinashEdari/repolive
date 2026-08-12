@@ -93,7 +93,7 @@ requires IPv4 connectivity; use the connection URI exactly as supplied and retai
 | `GITHUB_REQUEST_TIMEOUT_SECONDS` | Backend-only configuration | Optional | `15` |
 | `FREE_ANONYMOUS_ANALYSIS_LIMIT` | Backend-only configuration | Optional | `5` |
 | `FREE_AUTHENTICATED_ANALYSIS_LIMIT` | Backend-only configuration | Optional | `50` |
-| `MAX_REQUEST_BODY_BYTES` | Backend-only configuration | Optional | `4096` |
+| `MAX_REQUEST_BODY_BYTES` | Backend-only configuration | Optional | `24576` |
 | `MAX_REPOSITORY_FILES` | Backend-only configuration | Optional | `10000` |
 | `MAX_REPOSITORY_BYTES` | Backend-only configuration | Optional | `104857600` |
 | `MAX_REPOSITORY_PATH_BYTES` | Backend-only configuration | Optional | `1024` |

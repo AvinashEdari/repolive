@@ -43,7 +43,7 @@ services:
       - key: FREE_AUTHENTICATED_ANALYSIS_LIMIT
         value: "50"
       - key: MAX_REQUEST_BODY_BYTES
-        value: "4096"
+        value: "24576"
       - key: MAX_REPOSITORY_FILES
         value: "10000"
       - key: MAX_REPOSITORY_BYTES

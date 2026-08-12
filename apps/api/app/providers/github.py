@@ -16,6 +16,7 @@ from app.providers.base import (
     RepositoryRateLimitError,
     RepositoryTooLargeError,
 )
+from app.schemas.product import DiscoveryItem
 from app.schemas.repository import (
     RepositoryFile,
     RepositoryMetadata,
@@ -203,6 +204,110 @@ class GitHubRepositoryProvider(RepositoryProvider):
         finally:
             if owns_client:
                 await client.aclose()
+
+    async def search_repositories(self, query: str, limit: int) -> list[DiscoveryItem]:
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "RepoLive/0.1",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        if self.settings.github_token:
+            headers["Authorization"] = f"Bearer {self.settings.github_token}"
+        owns_client = self.client is None
+        client = self.client or httpx.AsyncClient(
+            base_url="https://api.github.com",
+            headers=headers,
+            timeout=self.settings.github_request_timeout_seconds,
+        )
+        try:
+            response = await client.get(
+                "/search/repositories",
+                params={"q": query, "per_page": limit, "sort": "updated", "order": "desc"},
+            )
+            self._raise_for_status(response)
+            payload = response.json()
+            if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+                raise RepositoryProviderError("GitHub returned an invalid search response.")
+            items = []
+            for raw in payload["items"][:limit]:
+                parsed = self._discovery_item(raw, query)
+                if parsed is not None:
+                    items.append(parsed)
+            return sorted(items, key=lambda item: (-item.score, item.full_name.lower()))
+        except (TypeError, ValueError) as exc:
+            raise RepositoryProviderError("GitHub returned an invalid search response.") from exc
+        except httpx.RequestError as exc:
+            raise RepositoryConnectivityError("GitHub could not be reached.") from exc
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    @staticmethod
+    def _discovery_item(raw: object, query: str) -> DiscoveryItem | None:
+        if not isinstance(raw, dict) or not isinstance(raw.get("full_name"), str):
+            return None
+        full_name = raw["full_name"]
+        parts = full_name.split("/")
+        if len(parts) != 2 or any(not _SEGMENT.fullmatch(part) for part in parts):
+            return None
+        topics = [item for item in raw.get("topics", []) if isinstance(item, str)][:20]
+        stars = raw.get("stargazers_count", 0)
+        if not isinstance(stars, int) or stars < 0:
+            stars = 0
+        license_payload = raw.get("license")
+        license_data: dict[str, object] = (
+            license_payload if isinstance(license_payload, dict) else {}
+        )
+        reasons, score = GitHubRepositoryProvider._rank_search_item(raw, query, topics, stars)
+        license_spdx = license_data.get("spdx_id")
+        return DiscoveryItem(
+            full_name=full_name,
+            url=f"https://github.com/{full_name}",
+            description=raw.get("description") if isinstance(raw.get("description"), str) else None,
+            primary_language=raw.get("language") if isinstance(raw.get("language"), str) else None,
+            topics=topics,
+            stars=stars,
+            updated_at=raw.get("updated_at"),
+            license_spdx=license_spdx if isinstance(license_spdx, str) else None,
+            score=score,
+            ranking_reasons=reasons,
+        )
+
+    @staticmethod
+    def _rank_search_item(
+        raw: dict[str, object], query: str, topics: list[str], stars: int
+    ) -> tuple[list[str], int]:
+        score = 25
+        reasons = ["Matched the bounded GitHub search query (+25)."]
+        terms = {part.lower() for part in re.findall(r"[A-Za-z0-9_.+-]+", query) if ":" not in part}
+        searchable = " ".join(
+            value.lower()
+            for value in (raw.get("name"), raw.get("description"))
+            if isinstance(value, str)
+        )
+        topic_matches = terms.intersection(item.lower() for item in topics)
+        if terms and any(term in searchable for term in terms):
+            score += 20
+            reasons.append("Name or description matches the requested terms (+20).")
+        if topic_matches:
+            score += 15
+            reasons.append("Repository topics match the request (+15).")
+        if raw.get("license"):
+            score += 10
+            reasons.append("A license is declared (+10).")
+        if raw.get("archived") is False:
+            score += 10
+            reasons.append("Repository is not archived (+10).")
+        if stars:
+            star_points = min(10, len(str(stars)) * 2)
+            score += star_points
+            reasons.append(
+                f"Community signal contributes a capped +{star_points}; stars do not dominate."
+            )
+        if raw.get("fork") is True:
+            score -= 10
+            reasons.append("Fork status reduces the score (-10).")
+        return reasons, min(max(score, 0), 100)
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:

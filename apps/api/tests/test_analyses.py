@@ -154,7 +154,7 @@ def test_provider_failures_have_specific_api_contracts(
 def test_oversized_request_body_is_rejected_before_validation() -> None:
     response = client.post(
         "/api/v1/analyses",
-        content="x" * 5000,
+        content="x" * 25_000,
         headers={"Content-Type": "application/json"},
     )
     assert response.status_code == 413
@@ -162,7 +162,7 @@ def test_oversized_request_body_is_rejected_before_validation() -> None:
 
 def test_oversized_request_body_without_content_length_is_rejected() -> None:
     def body() -> object:
-        yield b"x" * 5000
+        yield b"x" * 25_000
 
     response = client.post(
         "/api/v1/analyses",
