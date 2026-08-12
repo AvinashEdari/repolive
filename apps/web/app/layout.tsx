@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { siteDescription, siteName, siteUrl } from "../lib/site";
 import "./styles.css";
+import "./responsive.css";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,

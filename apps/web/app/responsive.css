@@ -1,0 +1,43 @@
+@media (max-width: 600px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .siteHeader nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    flex-basis: 100%;
+    width: 100%;
+    min-width: 0;
+    justify-content: space-between;
+    gap: 2px;
+    margin-left: 0;
+  }
+
+  .siteHeader nav a {
+    padding: 6px 4px;
+    font-size: 0.82rem;
+    text-align: center;
+  }
+
+  .pageShell > main,
+  .pageShell > main > * {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .pageShell > main > header h1 {
+    font-size: clamp(2.25rem, 12vw, 3.25rem);
+    overflow-wrap: anywhere;
+  }
+
+  .pageShell > main form,
+  .pageShell > main label,
+  .pageShell > main textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
