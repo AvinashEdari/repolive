@@ -28,6 +28,7 @@ export default function AccountPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [signedIn, setSignedIn] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro">("free");
+  const [billingAvailable, setBillingAvailable] = useState(false);
 
   const expireSession = useCallback(async () => {
     await supabase?.auth.signOut();
@@ -57,6 +58,13 @@ export default function AccountPage() {
         if (entitlementResponse.ok) {
           const entitlements = (await entitlementResponse.json()) as { plan: "free" | "pro" };
           setPlan(entitlements.plan);
+        }
+        const billingResponse = await fetch(`${apiUrl}/api/v1/billing/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (billingResponse.ok) {
+          const billing = (await billingResponse.json()) as { configured: boolean };
+          setBillingAvailable(billing.configured);
         }
       } else {
         setMessage("Saved analyses are temporarily unavailable. Please retry.");
@@ -189,8 +197,9 @@ export default function AccountPage() {
               <div className="notice">
                 Current plan: <strong>{plan === "pro" ? "Pro" : "Free"}</strong>. Billing uses
                 Stripe-hosted pages; RepoLive never receives card details.
-                <div className="buttonRow">
-                  {plan === "free" ? (
+                {billingAvailable ? (
+                  <div className="buttonRow">
+                    {plan === "free" ? (
                     <button
                       type="button"
                       className="secondaryButton"
@@ -198,7 +207,7 @@ export default function AccountPage() {
                     >
                       Upgrade to Pro
                     </button>
-                  ) : (
+                    ) : (
                     <button
                       type="button"
                       className="secondaryButton"
@@ -206,8 +215,11 @@ export default function AccountPage() {
                     >
                       Manage billing
                     </button>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ) : (
+                  <p>Plan upgrades are not available in this environment.</p>
+                )}
               </div>
               <button
                 type="button"

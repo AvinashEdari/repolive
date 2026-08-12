@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -21,6 +22,8 @@ from app.schemas.saas import (
 )
 
 router = APIRouter(tags=["saas"])
+_PUBLIC_ID = re.compile(r"^[A-Za-z0-9_-]{8,32}$")
+_KEY_ID = re.compile(r"^[A-Za-z0-9_-]{8,32}$")
 
 
 def service(store: Annotated[AnalysisStore, Depends(get_analysis_store)]) -> SaasService:
@@ -57,6 +60,8 @@ def revoke_api_key(
     user: Annotated[AuthUser, Depends(require_user)],
     saas: Annotated[SaasService, Depends(service)],
 ) -> Response:
+    if not _KEY_ID.fullmatch(key_id):
+        raise HTTPException(status_code=404, detail="API key not found.")
     if not saas.revoke_api_key(user.user_id, key_id):
         raise HTTPException(status_code=404, detail="API key not found.")
     return Response(status_code=204)
@@ -69,6 +74,8 @@ def external_report(
     store: Annotated[AnalysisStore, Depends(get_analysis_store)],
     saas: Annotated[SaasService, Depends(service)],
 ) -> dict[str, object]:
+    if not _PUBLIC_ID.fullmatch(public_id):
+        raise HTTPException(status_code=404, detail="Analysis not found.")
     if not saas.authenticate_api_key(x_api_key):
         raise HTTPException(status_code=401, detail="Invalid or exhausted API key.")
     report = store.get(public_id)
@@ -108,16 +115,50 @@ def admin_summary(
 async def billing_checkout(
     payload: CheckoutRequest,
     user: Annotated[AuthUser, Depends(require_user)],
+    store: Annotated[AnalysisStore, Depends(get_analysis_store)],
     idempotency_key: Annotated[str, Header(alias="idempotency-key", min_length=8, max_length=64)],
 ) -> dict[str, str]:
+    with store.engine.connect() as connection:
+        subscription = (
+            connection.execute(
+                select(
+                    subscriptions.c.status,
+                    subscriptions.c.stripe_customer_id,
+                    subscriptions.c.stripe_subscription_id,
+                ).where(subscriptions.c.user_id == user.user_id)
+            )
+            .mappings()
+            .one_or_none()
+        )
+    if (
+        subscription
+        and subscription["stripe_subscription_id"]
+        and subscription["status"] not in {"canceled", "incomplete_expired"}
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="This account already has a subscription. Use Manage billing instead.",
+        )
     url = await StripeBilling(get_settings()).checkout(
         user.user_id,
         user.email,
         payload.success_url,
         payload.cancel_url,
         idempotency_key,
+        str(subscription["stripe_customer_id"])
+        if subscription and subscription["stripe_customer_id"]
+        else None,
     )
     return {"url": url}
+
+
+@router.get("/billing/status")
+def billing_status() -> dict[str, object]:
+    return {
+        "configured": StripeBilling(get_settings()).configured,
+        "checkout_mode": "hosted",
+        "card_data_handled_by": "stripe",
+    }
 
 
 @router.post("/billing/portal")

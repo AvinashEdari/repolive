@@ -34,6 +34,8 @@ def test_migrations_upgrade_and_downgrade_schema(tmp_path: Path) -> None:
         }
         analysis_pk = inspector.get_pk_constraint("analyses")
         assert analysis_pk["constrained_columns"] == ["public_id"]
+        analysis_columns = {column["name"] for column in inspector.get_columns("analyses")}
+        assert {"visibility", "owner_user_id"}.issubset(analysis_columns)
         unique_constraints = inspector.get_unique_constraints("analyses")
         assert any(
             constraint["name"] == "uq_analysis_identity_version"
@@ -70,3 +72,4 @@ def test_migrations_render_for_postgresql_without_a_live_connection() -> None:
     assert "CREATE TABLE organizations" in rendered
     assert "CREATE TABLE github_installations" in rendered
     assert "CREATE TABLE operational_metrics" in rendered
+    assert "visibility VARCHAR(16) DEFAULT 'public' NOT NULL" in rendered

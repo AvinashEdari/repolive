@@ -11,7 +11,9 @@ from app.db.store import (
     AuthenticatedLimitExceeded,
     analyses,
     anonymous_usage,
+    api_keys,
     authenticated_usage,
+    webhook_events,
 )
 from app.schemas.analysis import AnalysisReport, DeterministicAnalysis, QualitySignals
 from app.schemas.repository import RepositoryMetadata, RepositoryReference, RepositorySnapshot
@@ -137,6 +139,20 @@ def test_database_ping_uses_live_connection() -> None:
     store.ping()
 
 
+def test_non_public_analysis_is_never_returned_by_public_lookup() -> None:
+    store = AnalysisStore("sqlite:///:memory:")
+    stored = store.save(empty_report(), "browser", 5, "user-a")
+    with store.engine.begin() as connection:
+        connection.execute(
+            analyses.update()
+            .where(analyses.c.public_id == stored.public_id)
+            .values(visibility="private", owner_user_id="user-a")
+        )
+
+    assert store.get(str(stored.public_id)) is None
+    assert store.list_for_user("user-a")[0]["public_id"] == stored.public_id
+
+
 def test_retention_dry_run_and_cleanup_preserve_owned_reports() -> None:
     store = AnalysisStore("sqlite:///:memory:")
     unowned = store.save(empty_report(), "old-browser", 5)
@@ -147,10 +163,28 @@ def test_retention_dry_run_and_cleanup_preserve_owned_reports() -> None:
         connection.execute(analyses.update().values(created_at=old))
         connection.execute(anonymous_usage.update().values(updated_at=old))
         connection.execute(authenticated_usage.update().values(updated_at=old))
+        connection.execute(
+            webhook_events.insert().values(event_id="evt_old", event_type="test", processed_at=old)
+        )
+        connection.execute(
+            api_keys.insert().values(
+                key_id="old-key",
+                user_id="user-a",
+                name="Old",
+                key_hash="a" * 64,
+                prefix="rl_live_old",
+                request_count=0,
+                active=False,
+                created_at=old,
+                quota_reset_at=cutoff,
+            )
+        )
 
     assert store.retention_candidates(cutoff) == {
         "anonymous_usage": 1,
         "authenticated_usage": 1,
+        "webhook_events": 1,
+        "revoked_api_keys": 1,
         "unowned_analyses": 1,
     }
     assert store.get(str(unowned.public_id)) is not None

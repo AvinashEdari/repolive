@@ -100,12 +100,16 @@ class SaasService:
             allowance = entitlements_for(plan).api_requests
             if request_count >= allowance:
                 return None
-            connection.execute(
+            result = connection.execute(
                 api_keys.update()
-                .where(api_keys.c.key_id == row["key_id"])
+                .where(
+                    api_keys.c.key_id == row["key_id"],
+                    api_keys.c.active.is_(True),
+                    api_keys.c.request_count < allowance,
+                )
                 .values(request_count=api_keys.c.request_count + 1, last_used_at=now)
             )
-            return str(row["user_id"])
+            return str(row["user_id"]) if result.rowcount else None
 
     def list_api_keys(self, user_id: str) -> list[dict[str, object]]:
         with self.store.engine.connect() as connection:

@@ -1,14 +1,7 @@
 # Deployment
 
 Stage 8 remains disabled by default. Before enabling it, configure the server-only variables listed
-in `ENVIRONMENT.md`, apply migration `0004_saas_foundation`, register the Stripe webhook at
-`/api/v1/billing/webhook`, and restrict GitHub App permissions to Metadata read and Contents read.
-Never place Stripe, analytics, API pepper, admin subjects, or GitHub App private-key values in
-Vercel or any `NEXT_PUBLIC_` variable. Billing and private repositories are not live until the
-corresponding sections of `RELEASE_CHECKLIST.md` pass.
-
-Stage 8 remains disabled by default. Before enabling it, configure the server-only variables listed
-in `ENVIRONMENT.md`, apply migration `0004_saas_foundation`, register the Stripe webhook at
+in `ENVIRONMENT.md`, apply all migrations through Alembic `head`, register the Stripe webhook at
 `/api/v1/billing/webhook`, and restrict GitHub App permissions to Metadata read and Contents read.
 Never place Stripe, analytics, API pepper, admin subjects, or GitHub App private-key values in
 Vercel or any `NEXT_PUBLIC_` variable. Billing and private repositories are not live until the
@@ -36,6 +29,28 @@ repository.
 6. Add platform-level rate limiting, request logging with credential redaction, database backups,
    monitoring, TLS, and secret rotation before public launch.
 7. Run backend/frontend suites and a public-repository smoke test in the deployed environment.
+
+## Stripe activation
+
+1. Finalize pricing, taxes, refunds, cancellation, failed-payment, support, and downgrade policy.
+2. Create a recurring Pro price and configure `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, and the
+   exact-origin `STRIPE_PORTAL_RETURN_URL` only in the backend secret store.
+3. Register `https://<api-host>/api/v1/billing/webhook` for `customer.subscription.*` events and
+   configure its signing secret as `STRIPE_WEBHOOK_SECRET`.
+4. Verify hosted Checkout and Portal URLs, valid and invalid signatures, duplicate/out-of-order
+   events, active/trialing grants, past-due/canceled downgrades, cancellation, and customer reuse.
+5. Keep billing disabled if any variable or policy is incomplete. RepoLive never handles card data.
+
+## GitHub App activation
+
+1. Create a GitHub App with repository **Metadata: read** and **Contents: read** only. Do not request
+   write, administration, workflow, issue, or organization-management permission.
+2. Store the App ID and PEM private key only in the backend secret store. Installation and user
+   access tokens must remain short-lived and in memory.
+3. Verify user and organization installation authorization, repository selection, access removal,
+   token expiry, cross-user isolation, and the fail-closed private visibility boundary.
+4. Do not enable private ingestion until private reports are owner-scoped end to end and every
+   private/public boundary test passes. Broad personal access tokens are not the production design.
 
 ## Staging database and authentication validation
 

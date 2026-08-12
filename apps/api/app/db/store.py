@@ -39,6 +39,8 @@ analyses = Table(
     Column("repository_name", String(200), nullable=False),
     Column("commit_sha", String(128), nullable=False),
     Column("analysis_version", String(32), nullable=False),
+    Column("visibility", String(16), nullable=False, default="public", index=True),
+    Column("owner_user_id", String(128), index=True),
     Column("status", String(32), nullable=False),
     Column("report_json", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
@@ -235,6 +237,7 @@ class AnalysisStore:
                         analyses.c.repository_name == identity["repository_name"],
                         analyses.c.commit_sha == identity["commit_sha"],
                         analyses.c.analysis_version == identity["analysis_version"],
+                        analyses.c.visibility == "public",
                     )
                 ).scalar_one_or_none()
                 if cached_json is not None:
@@ -268,6 +271,8 @@ class AnalysisStore:
                     analyses.insert().values(
                         public_id=public_id,
                         **identity,
+                        visibility="public",
+                        owner_user_id=None,
                         status=stored_report.status,
                         report_json=serialized,
                         created_at=now,
@@ -396,7 +401,10 @@ class AnalysisStore:
     def get(self, public_id: str) -> AnalysisReport | None:
         with self.engine.connect() as connection:
             serialized = connection.execute(
-                select(analyses.c.report_json).where(analyses.c.public_id == public_id)
+                select(analyses.c.report_json).where(
+                    analyses.c.public_id == public_id,
+                    analyses.c.visibility == "public",
+                )
             ).scalar_one_or_none()
         if serialized is None:
             return None
@@ -451,7 +459,7 @@ class AnalysisStore:
             return self._retention_counts(connection, before)
 
     def apply_retention(self, before: datetime) -> dict[str, int]:
-        """Delete expired counters and unowned cached reports in one transaction."""
+        """Delete explicitly eligible operational data in one transaction."""
         try:
             with self.engine.begin() as connection:
                 counts = self._retention_counts(connection, before)
@@ -460,6 +468,15 @@ class AnalysisStore:
                 )
                 connection.execute(
                     delete(authenticated_usage).where(authenticated_usage.c.updated_at < before)
+                )
+                connection.execute(
+                    delete(webhook_events).where(webhook_events.c.processed_at < before)
+                )
+                connection.execute(
+                    delete(api_keys).where(
+                        api_keys.c.active.is_(False),
+                        func.coalesce(api_keys.c.last_used_at, api_keys.c.created_at) < before,
+                    )
                 )
                 owned = exists().where(analysis_user_links.c.public_id == analyses.c.public_id)
                 connection.execute(delete(analyses).where(analyses.c.created_at < before, ~owned))
@@ -480,6 +497,19 @@ class AnalysisStore:
                 select(func.count())
                 .select_from(authenticated_usage)
                 .where(authenticated_usage.c.updated_at < before)
+            ).scalar_one(),
+            "webhook_events": connection.execute(
+                select(func.count())
+                .select_from(webhook_events)
+                .where(webhook_events.c.processed_at < before)
+            ).scalar_one(),
+            "revoked_api_keys": connection.execute(
+                select(func.count())
+                .select_from(api_keys)
+                .where(
+                    api_keys.c.active.is_(False),
+                    func.coalesce(api_keys.c.last_used_at, api_keys.c.created_at) < before,
+                )
             ).scalar_one(),
             "unowned_analyses": connection.execute(
                 select(func.count())

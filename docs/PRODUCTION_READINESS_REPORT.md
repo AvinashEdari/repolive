@@ -37,7 +37,8 @@ repository commands, or install repository dependencies.
 - Organization, membership, role, and shared-analysis tables establish the team boundary; invites,
   quota sharing, and member-management UI intentionally remain future work.
 - GitHub App scaffolding verifies installation access and creates short-lived installation tokens in
-  memory. Private analysis remains disabled until visibility and ownership are enforced end to end.
+  memory. Persistence and public lookups now fail closed on explicit visibility, but private
+  analysis remains disabled until owner-scoped ingestion and live isolation are verified end to end.
 
 ## Supported ecosystems
 

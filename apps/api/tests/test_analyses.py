@@ -197,3 +197,4 @@ def test_security_and_cache_headers_are_present() -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["permissions-policy"] == "camera=(), geolocation=(), microphone=()"
+    assert response.headers["cache-control"] == "no-store"

@@ -100,8 +100,7 @@ async def security_headers(
     response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=()"
     if settings.app_env == "production":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if request.method != "GET" or request.url.path.endswith("/analyses"):
-        response.headers["Cache-Control"] = "no-store"
+    response.headers["Cache-Control"] = "no-store"
     log_event(
         "request_completed",
         method=request.method,

@@ -24,9 +24,10 @@ item deletes only that ownership link, not the cached public report or another u
 
 ## Retention and deletion
 
-The operational policy is 90 days for anonymous/authenticated usage counters and unowned cached
-public reports. Reports linked to at least one signed-in history are preserved; after the final link
-is removed, they become eligible at the next cleanup if already older than 90 days. Run
+The operational policy is 90 days for anonymous/authenticated usage counters, processed webhook
+receipts, revoked API keys, and unowned cached public reports. Reports linked to at least one
+signed-in history are preserved; after the final link is removed, they become eligible at the next
+cleanup if already older than 90 days. Run
 `python -m app.maintenance --days 90` to preview exact counts and add `--execute` only in an approved
 maintenance window. The command uses one transaction and never removes owned reports.
 
@@ -38,10 +39,10 @@ for no more than 30 days where provider controls permit it.
 
 ## Analytics boundary
 
-RepoLive currently has no application analytics SDK. If analytics or error monitoring is added, do
-not capture authorization headers, cookies, access tokens, repository evidence content, passwords,
-database URLs, or complete request bodies. Prefer aggregate operational metrics and short-lived,
-pseudonymous identifiers. Update this document before enabling a new data recipient.
+Optional product analytics is disabled unless a server-side provider is configured. Only named
+lifecycle events and categorical allowlisted fields may be exported. Authorization headers,
+cookies, access tokens, repository identities or evidence, passwords, database URLs, emails, pasted
+errors, and request bodies are excluded. A new data recipient requires privacy and security review.
 
 ## Product-tool inputs
 
@@ -51,8 +52,6 @@ filters to GitHub and returns normalized public metadata; RepoLive does not pers
 The proposed local-system protocol prohibits hostnames, usernames, IP addresses, hardware serials,
 environment-variable values, file listings, installed-package inventories, and process listings.
 
-Optional product analytics accepts only named lifecycle events and categorical allowlisted fields;
-repository URLs, names, file paths, error text, user emails, tokens, and contents are excluded. API
-keys are stored only as keyed hashes. Stripe stores payment details; RepoLive stores customer and
-subscription identifiers plus status. GitHub user and installation tokens remain in memory and are
-not persisted.
+API keys are stored only as keyed hashes. Stripe stores payment details; RepoLive stores customer
+and subscription identifiers plus status. GitHub user and installation tokens remain in memory and
+are not persisted.

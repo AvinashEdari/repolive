@@ -12,6 +12,7 @@ The initial API exposes creation only; invitations and shared-history UI stay di
 authorization workflows.
 
 GitHub App support validates user access to an installation and uses short-lived installation
-tokens. PATs are not stored. Private analysis remains disabled until real credentials, repository
-selection, private visibility persistence, and cross-user tests are configured. Repository code is
-never executed in any plan.
+tokens. PATs are not stored. Analysis persistence has an explicit public/private visibility and
+owner boundary, and every unauthenticated/public lookup filters to public records. Private analysis
+remains disabled until real credentials, repository selection, owner-scoped ingestion/history, and
+cross-user tests are configured. Repository code is never executed in any plan.

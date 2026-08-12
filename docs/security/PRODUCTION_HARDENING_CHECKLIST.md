@@ -29,8 +29,8 @@
 
 ## Data lifecycle
 
-- [x] Publish concrete retention periods for cached reports, counters, logs, test accounts, and
-      backups; automate deletion where promised.
+- [ ] Schedule and monitor the code-complete 90-day cleanup for eligible counters, webhook receipts,
+      revoked API keys, and unowned reports; finalize provider log and backup expiry.
 - [ ] Test history-link deletion, subject erasure, account deletion, and backup expiry.
 - [ ] Explain that share links are public and ensure public reports contain no account identifier.
 - [ ] Review every new analytics, monitoring, or AI provider before sending it user or repository

@@ -27,8 +27,9 @@ then smoke-test ownership and sharing before routing traffic.
 From the backend service directory, preview the 90-day policy with
 `python -m app.maintenance --days 90`. Record the reported counts, take or confirm a current backup,
 then run `python -m app.maintenance --days 90 --execute` during an approved maintenance window.
-Verify readiness and a known owned report afterward. The command deletes expired usage counters and
-only cached reports without any current user-history owner.
+Verify readiness and a known owned report afterward. The command deletes expired usage counters,
+old webhook receipts, old revoked API keys, and only cached reports without a current user-history
+owner. Scheduling remains a hosting-platform task and must alert on failure.
 
 ## Rollback
 

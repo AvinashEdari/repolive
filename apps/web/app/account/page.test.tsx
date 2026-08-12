@@ -80,6 +80,7 @@ describe("account authentication", () => {
       .fn()
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ plan: "free" }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ configured: true }) })
       .mockResolvedValueOnce({
         ok: false,
         status: 503,
@@ -101,5 +102,28 @@ describe("account authentication", () => {
         headers: expect.objectContaining({ "Idempotency-Key": "checkout-request-1" }),
       }),
     );
+  });
+
+  it("does not expose an upgrade action when billing is disabled", async () => {
+    auth.getAccessToken.mockResolvedValue("valid-token");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
+        .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ plan: "free" }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ configured: false }),
+        }),
+    );
+    render(<AccountPage />);
+
+    auth.listener?.();
+    expect(
+      await screen.findByText("Plan upgrades are not available in this environment."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Upgrade to Pro" })).toBeNull();
   });
 });

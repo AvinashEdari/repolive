@@ -29,6 +29,7 @@ class StripeBilling:
         success_url: str,
         cancel_url: str,
         idempotency_key: str,
+        customer_id: str | None = None,
     ) -> str:
         self._validate_return_url(success_url)
         self._validate_return_url(cancel_url)
@@ -43,7 +44,9 @@ class StripeBilling:
             "client_reference_id": user_id,
             "subscription_data[metadata][user_id]": user_id,
         }
-        if email:
+        if customer_id:
+            form["customer"] = customer_id
+        elif email:
             form["customer_email"] = email
         payload = await self._post("/v1/checkout/sessions", form, idempotency_key)
         url = payload.get("url")
