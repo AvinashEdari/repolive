@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { getAccessToken, getSupabaseClient } from "../../lib/supabase";
 import { SiteHeader } from "../components/site-header";
 
@@ -27,15 +27,16 @@ export default function AccountPage() {
   );
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [signedIn, setSignedIn] = useState(false);
+  const [plan, setPlan] = useState<"free" | "pro">("free");
 
-  async function expireSession() {
+  const expireSession = useCallback(async () => {
     await supabase?.auth.signOut();
     setSignedIn(false);
     setHistory([]);
     setMessage("Your session expired. Sign in again to view private history.");
-  }
+  }, [supabase]);
 
-  async function loadHistory() {
+  const loadHistory = useCallback(async () => {
     const token = await getAccessToken();
     setSignedIn(Boolean(token));
     if (!token) {
@@ -50,13 +51,20 @@ export default function AccountPage() {
         await expireSession();
       } else if (response.ok) {
         setHistory((await response.json()) as HistoryItem[]);
+        const entitlementResponse = await fetch(`${apiUrl}/api/v1/me/entitlements`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (entitlementResponse.ok) {
+          const entitlements = (await entitlementResponse.json()) as { plan: "free" | "pro" };
+          setPlan(entitlements.plan);
+        }
       } else {
         setMessage("Saved analyses are temporarily unavailable. Please retry.");
       }
     } catch {
       setMessage("Could not reach RepoLive. Check your connection and retry.");
     }
-  }
+  }, [expireSession]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -64,7 +72,7 @@ export default function AccountPage() {
       void loadHistory();
     });
     return () => data.subscription.unsubscribe();
-  });
+  }, [loadHistory, supabase]);
 
   async function submit(event: FormEvent, mode: "signin" | "signup") {
     event.preventDefault();
@@ -91,6 +99,34 @@ export default function AccountPage() {
     if (response.status === 401) await expireSession();
     else if (response.ok) await loadHistory();
     else setMessage("That saved analysis could not be removed. Please retry.");
+  }
+
+  async function openBilling(kind: "checkout" | "portal") {
+    const token = await getAccessToken();
+    if (!token) return;
+    const body =
+      kind === "checkout"
+        ? JSON.stringify({
+            success_url: `${window.location.origin}/account?billing=success`,
+            cancel_url: `${window.location.origin}/account?billing=canceled`,
+          })
+        : undefined;
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/billing/${kind}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body,
+      });
+      const result = (await response.json()) as { url?: string; detail?: string };
+      if (response.ok && result.url) window.location.assign(result.url);
+      else setMessage(result.detail ?? "Billing is currently unavailable.");
+    } catch {
+      setMessage("Could not reach billing. Check your connection and retry.");
+    }
   }
 
   return (
@@ -150,6 +186,29 @@ export default function AccountPage() {
           )}
           {signedIn && (
             <>
+              <div className="notice">
+                Current plan: <strong>{plan === "pro" ? "Pro" : "Free"}</strong>. Billing uses
+                Stripe-hosted pages; RepoLive never receives card details.
+                <div className="buttonRow">
+                  {plan === "free" ? (
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => void openBilling("checkout")}
+                    >
+                      Upgrade to Pro
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => void openBilling("portal")}
+                    >
+                      Manage billing
+                    </button>
+                  )}
+                </div>
+              </div>
               <button
                 type="button"
                 className="secondaryButton"

@@ -50,3 +50,9 @@ application logs or responses. Comparison stores no new data. Discovery sends th
 filters to GitHub and returns normalized public metadata; RepoLive does not persist search history.
 The proposed local-system protocol prohibits hostnames, usernames, IP addresses, hardware serials,
 environment-variable values, file listings, installed-package inventories, and process listings.
+
+Optional product analytics accepts only named lifecycle events and categorical allowlisted fields;
+repository URLs, names, file paths, error text, user emails, tokens, and contents are excluded. API
+keys are stored only as keyed hashes. Stripe stores payment details; RepoLive stores customer and
+subscription identifiers plus status. GitHub user and installation tokens remain in memory and are
+not persisted.

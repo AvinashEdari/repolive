@@ -44,3 +44,10 @@ For suspected credential exposure, restrict access, rotate the credential at its
 the replacement, invalidate affected sessions when applicable, and review sanitized audit logs.
 For abuse, preserve safe aggregate evidence, apply edge controls, and avoid identifying users from
 untrusted forwarding headers. Document timeline, impact, remediation, and follow-up tests.
+
+## Billing and entitlement rollback
+
+Disable checkout by removing Stripe server variables; deterministic analysis remains available.
+Never edit subscription rows to settle payment disputes. Replay only verified events and rely on
+durable event IDs for idempotency. For webhook regressions, deploy the last verified API, keep
+checkout disabled, reconcile affected customers in Stripe, and re-enable only after tests pass.

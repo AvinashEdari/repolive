@@ -56,3 +56,23 @@ services:
         value: "262144"
       - key: MAX_EVIDENCE_TOTAL_BYTES
         value: "2097152"
+      - key: ANALYTICS_ENDPOINT
+        sync: false
+      - key: ANALYTICS_WRITE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRO_PRICE_ID
+        sync: false
+      - key: STRIPE_PORTAL_RETURN_URL
+        value: https://repolive-web.vercel.app/account
+      - key: ADMIN_USER_IDS
+        sync: false
+      - key: API_KEY_PEPPER
+        generateValue: true
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false

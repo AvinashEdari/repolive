@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     max_evidence_files: int = Field(default=40, ge=1, le=200)
     max_evidence_file_bytes: int = Field(default=256 * 1024, ge=1)
     max_evidence_total_bytes: int = Field(default=2 * 1024 * 1024, ge=1)
+    analytics_endpoint: str | None = None
+    analytics_write_key: str | None = None
+    stripe_secret_key: str | None = None
+    stripe_webhook_secret: str | None = None
+    stripe_pro_price_id: str | None = None
+    stripe_portal_return_url: str | None = None
+    admin_user_ids: str = ""
+    api_key_pepper: str | None = None
+    github_app_id: str | None = None
+    github_app_private_key: str | None = None
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
@@ -72,6 +82,30 @@ class Settings(BaseSettings):
             or supabase_url.fragment
         ):
             raise ValueError("Production requires an HTTPS SUPABASE_URL.")
+        analytics_values = [self.analytics_endpoint, self.analytics_write_key]
+        if any(analytics_values) and not all(analytics_values):
+            raise ValueError("Analytics production configuration must be complete.")
+        if self.analytics_endpoint and urlsplit(self.analytics_endpoint).scheme != "https":
+            raise ValueError("Production ANALYTICS_ENDPOINT must use HTTPS.")
+        stripe_values = [
+            self.stripe_secret_key,
+            self.stripe_webhook_secret,
+            self.stripe_pro_price_id,
+        ]
+        if any(stripe_values) and not all(stripe_values):
+            raise ValueError("Stripe production configuration must be complete.")
+        if self.stripe_portal_return_url:
+            portal_origin = urlsplit(self.stripe_portal_return_url)
+            if (portal_origin.scheme, portal_origin.netloc) != (
+                web_origin.scheme,
+                web_origin.netloc,
+            ):
+                raise ValueError("STRIPE_PORTAL_RETURN_URL must use WEB_ORIGIN.")
+        github_app_values = [self.github_app_id, self.github_app_private_key]
+        if any(github_app_values) and not all(github_app_values):
+            raise ValueError("GitHub App production configuration must be complete.")
+        if not self.api_key_pepper or len(self.api_key_pepper) < 32:
+            raise ValueError("Production API_KEY_PEPPER must contain at least 32 characters.")
         return self
 
 

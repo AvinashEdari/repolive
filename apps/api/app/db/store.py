@@ -1,9 +1,10 @@
 import json
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -13,8 +14,10 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    case,
     create_engine,
     func,
+    or_,
 )
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -54,6 +57,7 @@ anonymous_usage = Table(
     Column("anonymous_id", String(128), primary_key=True),
     Column("analysis_count", Integer, nullable=False, default=0),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("period_started_at", DateTime(timezone=True)),
 )
 authenticated_usage = Table(
     "authenticated_usage",
@@ -61,6 +65,7 @@ authenticated_usage = Table(
     Column("user_id", String(128), primary_key=True),
     Column("analysis_count", Integer, nullable=False, default=0),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("period_started_at", DateTime(timezone=True)),
 )
 analysis_user_links = Table(
     "analysis_user_links",
@@ -73,6 +78,95 @@ analysis_user_links = Table(
         primary_key=True,
     ),
     Column("saved_at", DateTime(timezone=True), nullable=False),
+)
+subscriptions = Table(
+    "subscriptions",
+    metadata,
+    Column("user_id", String(128), primary_key=True),
+    Column("plan", String(32), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("stripe_customer_id", String(128), unique=True),
+    Column("stripe_subscription_id", String(128), unique=True),
+    Column("current_period_end", DateTime(timezone=True)),
+    Column("provider_event_created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+webhook_events = Table(
+    "webhook_events",
+    metadata,
+    Column("event_id", String(128), primary_key=True),
+    Column("event_type", String(128), nullable=False),
+    Column("processed_at", DateTime(timezone=True), nullable=False),
+)
+api_keys = Table(
+    "api_keys",
+    metadata,
+    Column("key_id", String(32), primary_key=True),
+    Column("user_id", String(128), nullable=False, index=True),
+    Column("name", String(80), nullable=False),
+    Column("key_hash", String(64), nullable=False, unique=True),
+    Column("prefix", String(16), nullable=False),
+    Column("request_count", Integer, nullable=False, default=0),
+    Column("active", Boolean, nullable=False, default=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("last_used_at", DateTime(timezone=True)),
+    Column("quota_reset_at", DateTime(timezone=True), nullable=False),
+)
+organizations = Table(
+    "organizations",
+    metadata,
+    Column("organization_id", String(32), primary_key=True),
+    Column("name", String(100), nullable=False),
+    Column("owner_user_id", String(128), nullable=False, index=True),
+    Column("plan", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+organization_members = Table(
+    "organization_members",
+    metadata,
+    Column(
+        "organization_id",
+        String(32),
+        ForeignKey("organizations.organization_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("user_id", String(128), primary_key=True),
+    Column("role", String(16), nullable=False),
+    Column("joined_at", DateTime(timezone=True), nullable=False),
+)
+organization_analyses = Table(
+    "organization_analyses",
+    metadata,
+    Column(
+        "organization_id",
+        String(32),
+        ForeignKey("organizations.organization_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "public_id",
+        String(32),
+        ForeignKey("analyses.public_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("shared_at", DateTime(timezone=True), nullable=False),
+)
+github_installations = Table(
+    "github_installations",
+    metadata,
+    Column("installation_id", String(64), primary_key=True),
+    Column("owner_user_id", String(128), nullable=False, index=True),
+    Column("account_login", String(100), nullable=False),
+    Column("account_type", String(32), nullable=False),
+    Column("active", Boolean, nullable=False, default=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+operational_metrics = Table(
+    "operational_metrics",
+    metadata,
+    Column("metric", String(64), primary_key=True),
+    Column("value", Integer, nullable=False, default=0),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
 )
 
 
@@ -194,15 +288,28 @@ class AnalysisStore:
         limit: int,
         now: datetime,
     ) -> bool:
-        values = {identifier_column: identifier, "analysis_count": 1, "updated_at": now}
+        cutoff = now - timedelta(days=30)
+        values = {
+            identifier_column: identifier,
+            "analysis_count": 1,
+            "updated_at": now,
+            "period_started_at": now,
+        }
         identifier_field = table.c[identifier_column]
+        expired = or_(table.c.period_started_at.is_(None), table.c.period_started_at < cutoff)
+        next_count = case((expired, 1), else_=table.c.analysis_count + 1)
+        next_period = case((expired, now), else_=table.c.period_started_at)
         if connection.dialect.name == "postgresql":
             postgresql_statement = postgresql_insert(table).values(**values)
             result = connection.execute(
                 postgresql_statement.on_conflict_do_update(
                     index_elements=[identifier_field],
-                    set_={"analysis_count": table.c.analysis_count + 1, "updated_at": now},
-                    where=table.c.analysis_count < limit,
+                    set_={
+                        "analysis_count": next_count,
+                        "updated_at": now,
+                        "period_started_at": next_period,
+                    },
+                    where=or_(table.c.analysis_count < limit, expired),
                 )
             )
             return bool(result.rowcount)
@@ -211,15 +318,24 @@ class AnalysisStore:
             result = connection.execute(
                 sqlite_statement.on_conflict_do_update(
                     index_elements=[identifier_field],
-                    set_={"analysis_count": table.c.analysis_count + 1, "updated_at": now},
-                    where=table.c.analysis_count < limit,
+                    set_={
+                        "analysis_count": next_count,
+                        "updated_at": now,
+                        "period_started_at": next_period,
+                    },
+                    where=or_(table.c.analysis_count < limit, expired),
                 )
             )
             return bool(result.rowcount)
         current = connection.execute(
-            select(table.c.analysis_count).where(identifier_field == identifier)
-        ).scalar_one_or_none()
-        if current is not None and current >= limit:
+            select(table.c.analysis_count, table.c.period_started_at).where(
+                identifier_field == identifier
+            )
+        ).one_or_none()
+        if current is not None and current.period_started_at and current.period_started_at < cutoff:
+            current = None
+            connection.execute(table.delete().where(identifier_field == identifier))
+        if current is not None and current.analysis_count >= limit:
             return False
         if current is None:
             connection.execute(table.insert().values(**values))
@@ -227,7 +343,7 @@ class AnalysisStore:
             connection.execute(
                 table.update()
                 .where(identifier_field == identifier)
-                .values(analysis_count=current + 1, updated_at=now)
+                .values(analysis_count=current.analysis_count + 1, updated_at=now)
             )
         return True
 
@@ -292,6 +408,42 @@ class AnalysisStore:
                 connection.execute(text("SELECT 1"))
         except SQLAlchemyError as exc:
             raise AnalysisPersistenceError("Database readiness check failed.") from exc
+
+    def increment_metric(self, metric: str) -> None:
+        if metric not in {
+            "analysis_completed",
+            "analysis_failed",
+            "cache_reused",
+            "provider_failed",
+            "quota_exceeded",
+        }:
+            raise ValueError("Unsupported operational metric.")
+        now = datetime.now(UTC)
+        with self.engine.begin() as connection:
+            values = {"metric": metric, "value": 1, "updated_at": now}
+            if connection.dialect.name == "postgresql":
+                postgresql_statement = postgresql_insert(operational_metrics).values(**values)
+                connection.execute(
+                    postgresql_statement.on_conflict_do_update(
+                        index_elements=[operational_metrics.c.metric],
+                        set_={"value": operational_metrics.c.value + 1, "updated_at": now},
+                    )
+                )
+            else:
+                sqlite_statement = sqlite_insert(operational_metrics).values(**values)
+                connection.execute(
+                    sqlite_statement.on_conflict_do_update(
+                        index_elements=[operational_metrics.c.metric],
+                        set_={"value": operational_metrics.c.value + 1, "updated_at": now},
+                    )
+                )
+
+    def operational_summary(self) -> dict[str, int]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                select(operational_metrics.c.metric, operational_metrics.c.value)
+            ).all()
+        return {str(metric): int(value) for metric, value in rows}
 
     def retention_candidates(self, before: datetime) -> dict[str, int]:
         """Count records eligible for retention cleanup without changing the database."""

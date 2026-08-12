@@ -13,6 +13,7 @@ from starlette.responses import Response
 from app.api.routes.analyses import router as analyses_router
 from app.api.routes.health import router as health_router
 from app.api.routes.product import router as product_router
+from app.api.routes.saas import router as saas_router
 from app.core.config import get_settings
 from app.observability import bind_request_id, log_event, reset_request_id
 
@@ -35,7 +36,7 @@ app.add_middleware(
     allow_origins=[settings.web_origin],
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "Idempotency-Key", "X-API-Key"],
 )
 
 
@@ -121,3 +122,4 @@ def _safe_route(request: Request) -> str:
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(analyses_router, prefix="/api/v1")
 app.include_router(product_router, prefix="/api/v1")
+app.include_router(saas_router, prefix="/api/v1")

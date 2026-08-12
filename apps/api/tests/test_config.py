@@ -16,6 +16,7 @@ def test_production_accepts_explicit_https_postgres_configuration() -> None:
         web_origin="https://repolive.example",
         allowed_hosts="api.repolive.example",
         supabase_url="https://project.supabase.co",
+        api_key_pepper="x" * 32,
     )
     assert settings.app_env == "production"
 
@@ -55,6 +56,7 @@ def test_production_rejects_non_origin_urls(field: str, value: str, message: str
         "web_origin": "https://repolive.example",
         "allowed_hosts": "api.repolive.example",
         "supabase_url": "https://project.supabase.co",
+        "api_key_pepper": "x" * 32,
         field: value,
     }
     with pytest.raises(ValidationError, match=message):
@@ -73,4 +75,56 @@ def test_production_requires_exact_nonempty_trusted_hosts(allowed_hosts: str) ->
             web_origin="https://repolive.example",
             allowed_hosts=allowed_hosts,
             supabase_url="https://project.supabase.co",
+            api_key_pepper="x" * 32,
+        )
+
+
+def test_production_requires_api_key_pepper_even_when_api_keys_are_unused() -> None:
+    with pytest.raises(ValidationError, match="API_KEY_PEPPER"):
+        Settings(
+            app_env="production",
+            database_url="postgresql+psycopg://user:password@db.example/repolive",
+            web_origin="https://repolive.example",
+            allowed_hosts="api.repolive.example",
+            supabase_url="https://project.supabase.co",
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("analytics_endpoint", "https://analytics.example/capture", "Analytics"),
+        ("stripe_pro_price_id", "price_test", "Stripe"),
+        ("github_app_private_key", "private-key", "GitHub App"),
+    ],
+)
+def test_production_rejects_partial_optional_integrations(
+    field: str, value: str, message: str
+) -> None:
+    options = {
+        "app_env": "production",
+        "database_url": "postgresql+psycopg://user:password@db.example/repolive",
+        "web_origin": "https://repolive.example",
+        "allowed_hosts": "api.repolive.example",
+        "supabase_url": "https://project.supabase.co",
+        "api_key_pepper": "x" * 32,
+        field: value,
+    }
+    with pytest.raises(ValidationError, match=message):
+        Settings(**options)
+
+
+def test_production_billing_portal_must_return_to_web_origin() -> None:
+    with pytest.raises(ValidationError, match="WEB_ORIGIN"):
+        Settings(
+            app_env="production",
+            database_url="postgresql+psycopg://user:password@db.example/repolive",
+            web_origin="https://repolive.example",
+            allowed_hosts="api.repolive.example",
+            supabase_url="https://project.supabase.co",
+            api_key_pepper="x" * 32,
+            stripe_secret_key="sk_test",
+            stripe_webhook_secret="whsec_test",
+            stripe_pro_price_id="price_test",
+            stripe_portal_return_url="https://evil.example/account",
         )

@@ -1,5 +1,12 @@
 # Environment reference
 
+Stage 8 optional server integrations use `ANALYTICS_ENDPOINT`, `ANALYTICS_WRITE_KEY`,
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID`,
+`STRIPE_PORTAL_RETURN_URL`, `ADMIN_USER_IDS`, `API_KEY_PEPPER`, `GITHUB_APP_ID`, and
+`GITHUB_APP_PRIVATE_KEY`. `API_KEY_PEPPER` is required and must contain at least 32 random
+characters in production. Stripe must be configured as a complete set or left disabled. None of
+these values may use a `NEXT_PUBLIC_` prefix.
+
 - `APP_ENV`: `development`, `test`, or `production`. Production activates strict validation.
 - `DATABASE_URL`: server-only SQLAlchemy URL. SQLite is the local default; production accepts
   `postgresql://` or `postgresql+psycopg://` with the synchronous psycopg driver.

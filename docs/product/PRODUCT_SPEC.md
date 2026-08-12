@@ -22,3 +22,12 @@ configurable allowance and unchanged commit/version reports are reused.
   topic, license, activity state, fork state, and a capped star contribution.
 - Local system detection remains a protocol design only. The website cannot inspect a visitor's
   machine; a future client would require explicit execution and reviewable consent.
+
+## SaaS foundation
+
+Free and Pro capabilities are described by centralized entitlements. Billing uses Stripe-hosted
+pages only. Authenticated users can create revocable API keys for safe versioned report retrieval;
+keys never expose raw evidence. Admin summaries are aggregate and require an explicit server-side
+subject allowlist. Organizations and GitHub App installations have persistence and authorization
+boundaries, but team invitations, shared-history UI, and private-repository analysis remain disabled
+until their external launch gates are complete.

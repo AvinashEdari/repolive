@@ -27,3 +27,7 @@ report and never echoes or executes the input. Comparison reads two cached publi
 uses one bounded official GitHub repository-search request and returns a transparent multi-signal
 score where popularity is capped. The future local-system protocol is design-only and requires an
 explicit user-run client and consent preview; the website performs no machine inspection.
+
+Stage 8 SaaS boundaries are detailed in `SAAS_ARCHITECTURE.md`: optional analytics, centralized
+entitlements, hosted billing, external API keys, aggregate admin operations, teams, and the
+disabled-by-default GitHub App private-repository design.

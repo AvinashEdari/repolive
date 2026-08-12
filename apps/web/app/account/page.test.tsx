@@ -73,4 +73,33 @@ describe("account authentication", () => {
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
   });
+
+  it("uses an idempotent hosted-checkout request and explains unavailable billing", async () => {
+    auth.getAccessToken.mockResolvedValue("valid-token");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ plan: "free" }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({ detail: "Billing is not configured." }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("crypto", { randomUUID: () => "checkout-request-1" });
+    render(<AccountPage />);
+
+    auth.listener?.();
+    const upgrade = await screen.findByRole("button", { name: "Upgrade to Pro" });
+    fireEvent.click(upgrade);
+
+    expect(await screen.findByText("Billing is not configured.")).toBeTruthy();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "http://localhost:8000/api/v1/billing/checkout",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "Idempotency-Key": "checkout-request-1" }),
+      }),
+    );
+  });
 });

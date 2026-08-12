@@ -23,6 +23,14 @@ def test_migrations_upgrade_and_downgrade_schema(tmp_path: Path) -> None:
             "analysis_user_links",
             "anonymous_usage",
             "authenticated_usage",
+            "subscriptions",
+            "webhook_events",
+            "api_keys",
+            "organizations",
+            "organization_members",
+            "organization_analyses",
+            "github_installations",
+            "operational_metrics",
         }
         analysis_pk = inspector.get_pk_constraint("analyses")
         assert analysis_pk["constrained_columns"] == ["public_id"]
@@ -57,3 +65,8 @@ def test_migrations_render_for_postgresql_without_a_live_connection() -> None:
     assert "uq_analysis_identity_version" in rendered
     assert "CREATE TABLE analysis_user_links" in rendered
     assert "CREATE TABLE authenticated_usage" in rendered
+    assert "CREATE TABLE subscriptions" in rendered
+    assert "CREATE TABLE api_keys" in rendered
+    assert "CREATE TABLE organizations" in rendered
+    assert "CREATE TABLE github_installations" in rendered
+    assert "CREATE TABLE operational_metrics" in rendered

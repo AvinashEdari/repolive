@@ -46,7 +46,7 @@ Last updated: 2026-08-12
 - The Render Blueprint now declares the full production pool, authentication, request, evidence,
   and quota configuration. Deployment documentation defines exact Supabase, Render, and Vercel
   variable boundaries and staging smoke-test requirements.
-- Verification: 106 backend tests, 9 frontend interaction tests, migration upgrade/downgrade,
+- Verification: 126 backend tests, 10 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.
@@ -73,6 +73,10 @@ Last updated: 2026-08-12
   machine inspection, billing, sandbox, or repository execution was added.
 - Operational follow-up adds dry-run-first 90-day cleanup for expired counters and unowned reports,
   bounded README setup-section extraction, and conflicting Node.js lockfile warnings.
+- Stage 8 code adds optional allowlisted analytics, centralized Free/Pro entitlements, Stripe-hosted
+  billing with signed idempotent webhooks, hashed quota-bound API keys, server-authorized aggregate
+  admin metrics, organization ownership, and a least-privilege GitHub App boundary. Billing,
+  analytics export, and private repositories remain disabled until external configuration passes.
 
 ## Planned
 

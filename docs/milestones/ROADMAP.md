@@ -9,5 +9,10 @@
 7. High-value product expansion: deterministic pasted-error diagnosis, cached repository
    comparison, bounded explainable GitHub discovery, and a privacy-preserving local-agent protocol
    design. (Implemented; local agent remains intentionally unbuilt)
-8. Future production-launch work: distributed abuse controls, retention automation, monitoring
-   provider selection, professional legal review, and isolated-execution research.
+8. SaaS completion foundations: analytics, entitlements, hosted Stripe billing, API keys, aggregate
+   admin metrics, organizations, and GitHub App architecture. (Code complete; external activation
+   and commercial/private-repository launch gates pending.)
+9. Production-launch work: distributed abuse controls, retention automation, monitoring provider
+   selection, professional legal review, paid billing activation, and private-repository validation.
+10. Post-launch Stage 2 research: isolated arbitrary-repository execution. It remains disabled and
+    requires a separate design with strong containment, egress control, and disposable workers.

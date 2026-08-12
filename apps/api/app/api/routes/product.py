@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.analysis.comparison import compare_reports
 from app.analysis.diagnosis import diagnose_error
+from app.analytics import capture_product_event
 from app.api.routes.analyses import get_repository_provider
 from app.db.store import AnalysisStore, get_analysis_store
 from app.observability import log_event
@@ -53,6 +54,7 @@ def compare_repositories(
     left = _report_or_404(store, payload.left_public_id)
     right = _report_or_404(store, payload.right_public_id)
     result = compare_reports(left, right)
+    capture_product_event("comparison_performed", status="completed")
     log_event(
         "repositories_compared", left_analysis_id=left.public_id, right_analysis_id=right.public_id
     )

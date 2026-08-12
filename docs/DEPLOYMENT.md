@@ -1,5 +1,19 @@
 # Deployment
 
+Stage 8 remains disabled by default. Before enabling it, configure the server-only variables listed
+in `ENVIRONMENT.md`, apply migration `0004_saas_foundation`, register the Stripe webhook at
+`/api/v1/billing/webhook`, and restrict GitHub App permissions to Metadata read and Contents read.
+Never place Stripe, analytics, API pepper, admin subjects, or GitHub App private-key values in
+Vercel or any `NEXT_PUBLIC_` variable. Billing and private repositories are not live until the
+corresponding sections of `RELEASE_CHECKLIST.md` pass.
+
+Stage 8 remains disabled by default. Before enabling it, configure the server-only variables listed
+in `ENVIRONMENT.md`, apply migration `0004_saas_foundation`, register the Stripe webhook at
+`/api/v1/billing/webhook`, and restrict GitHub App permissions to Metadata read and Contents read.
+Never place Stripe, analytics, API pepper, admin subjects, or GitHub App private-key values in
+Vercel or any `NEXT_PUBLIC_` variable. Billing and private repositories are not live until the
+corresponding sections of `RELEASE_CHECKLIST.md` pass.
+
 The staging stack was deployed and validated on 2026-08-11:
 
 - Frontend: `https://repolive-web.vercel.app` (Vercel)
@@ -100,6 +114,16 @@ requires IPv4 connectivity; use the connection URI exactly as supplied and retai
 | `MAX_EVIDENCE_FILES` | Backend-only configuration | Optional | `40` |
 | `MAX_EVIDENCE_FILE_BYTES` | Backend-only configuration | Optional | `262144` |
 | `MAX_EVIDENCE_TOTAL_BYTES` | Backend-only configuration | Optional | `2097152` |
+| `ANALYTICS_ENDPOINT` | Backend-only configuration | Optional | HTTPS provider ingestion URL |
+| `ANALYTICS_WRITE_KEY` | Backend-only secret | Required with analytics endpoint | Provider key |
+| `STRIPE_SECRET_KEY` | Backend-only secret | Required for billing | Stripe restricted secret key |
+| `STRIPE_WEBHOOK_SECRET` | Backend-only secret | Required for billing | Stripe endpoint signing secret |
+| `STRIPE_PRO_PRICE_ID` | Backend-only configuration | Required for billing | Hosted Pro recurring price ID |
+| `STRIPE_PORTAL_RETURN_URL` | Backend-only configuration | Optional until billing | Exact frontend account URL |
+| `ADMIN_USER_IDS` | Backend-only configuration | Optional | Comma-separated Supabase user IDs |
+| `API_KEY_PEPPER` | Backend-only secret | Yes | At least 32 random characters |
+| `GITHUB_APP_ID` | Backend-only configuration | Required for private-repo pilot | GitHub App ID |
+| `GITHUB_APP_PRIVATE_KEY` | Backend-only secret | Required with App ID | PEM private key |
 
 `DATABASE_URL`, `GITHUB_TOKEN`, and any future credentials must be entered as Render secrets. The
 checked-in Blueprint intentionally contains names and safe defaults only.

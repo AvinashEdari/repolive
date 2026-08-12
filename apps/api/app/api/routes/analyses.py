@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.analysis.pipeline import AnalysisPipeline
+from app.analytics import capture_product_event
 from app.auth import AuthUser, get_optional_user, require_user
 from app.compatibility import MachineCompatibilityResult, MachineProfile, evaluate_machine
 from app.core.config import get_settings
@@ -27,6 +28,7 @@ from app.providers.base import (
     RepositoryTooLargeError,
 )
 from app.providers.github import GitHubRepositoryProvider
+from app.saas import SaasService
 from app.schemas.analysis import AnalysisHistoryItem, AnalysisReport
 from app.schemas.repository import AnalysisRequest
 
@@ -48,6 +50,7 @@ async def request_analysis(
     store: Annotated[AnalysisStore, Depends(get_analysis_store)],
     user: Annotated[AuthUser | None, Depends(get_optional_user)],
 ) -> AnalysisReport:
+    capture_product_event("analysis_submitted", authenticated=user is not None, provider="github")
     try:
         repository = provider.parse_url(payload.repository_url)
     except InvalidRepositoryUrl as exc:
@@ -55,9 +58,11 @@ async def request_analysis(
     try:
         snapshot = await provider.fetch_snapshot(repository)
     except RepositoryNotFoundError as exc:
+        _metric(store, "provider_failed")
         log_event("github_provider_failure", reason="not_found", status=404)
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RepositoryRateLimitError as exc:
+        _metric(store, "provider_failed")
         log_event(
             "github_provider_failure",
             reason="rate_limited",
@@ -67,12 +72,16 @@ async def request_analysis(
         headers = {"Retry-After": str(exc.retry_after_seconds)} if exc.retry_after_seconds else None
         raise HTTPException(status_code=429, detail=str(exc), headers=headers) from exc
     except RepositoryTooLargeError as exc:
+        _metric(store, "analysis_failed")
         log_event("github_provider_failure", reason="repository_too_large", status=413)
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except RepositoryConnectivityError as exc:
+        _metric(store, "provider_failed")
         log_event("github_provider_failure", reason="connectivity", status=504)
         raise HTTPException(status_code=504, detail=str(exc)) from exc
     except RepositoryProviderError as exc:
+        _metric(store, "provider_failed")
+        capture_product_event("analysis_failed", category="provider", status=502)
         log_event("github_provider_failure", reason="provider_error", status=502)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     report = (
@@ -85,20 +94,29 @@ async def request_analysis(
         candidate_id if _ANONYMOUS_ID.fullmatch(candidate_id) else secrets.token_urlsafe(24)
     )
     try:
+        authenticated_limit = (
+            SaasService(store, get_settings().api_key_pepper or "development-only")
+            .plan_for(user.user_id)
+            .monthly_analyses
+            if user
+            else get_settings().free_authenticated_analysis_limit
+        )
         stored_report = store.save(
             report,
             anonymous_id,
             get_settings().free_anonymous_analysis_limit,
             user.user_id if user else None,
-            get_settings().free_authenticated_analysis_limit,
+            authenticated_limit,
         )
     except AnonymousLimitExceeded as exc:
+        _metric(store, "quota_exceeded")
         log_event("quota_exceeded", identity_type="anonymous", status=429)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Anonymous analysis allowance exhausted.",
         ) from exc
     except AuthenticatedLimitExceeded as exc:
+        _metric(store, "quota_exceeded")
         log_event("quota_exceeded", identity_type="authenticated", status=429)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -127,6 +145,15 @@ async def request_analysis(
         authenticated=user is not None,
         repository_provider=stored_report.snapshot.repository.provider,
         file_count=len(stored_report.snapshot.files),
+    )
+    capture_product_event(
+        "cache_reused" if stored_report.cache_status == "cached" else "analysis_completed",
+        authenticated=user is not None,
+        cache_status=stored_report.cache_status,
+        provider=stored_report.snapshot.repository.provider,
+    )
+    _metric(
+        store, "cache_reused" if stored_report.cache_status == "cached" else "analysis_completed"
     )
     return stored_report
 
@@ -176,4 +203,12 @@ def get_analysis(
     report = store.get(public_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Analysis not found.")
+    capture_product_event("share_opened", status="found")
     return report
+
+
+def _metric(store: AnalysisStore, name: str) -> None:
+    try:
+        store.increment_metric(name)
+    except Exception:
+        log_event("operational_metric_failed", level=logging.ERROR, metric=name)
