@@ -173,10 +173,11 @@ def test_oversized_request_body_without_content_length_is_rejected() -> None:
 
 
 def test_malformed_anonymous_cookie_is_rotated() -> None:
-    response = client.post(
+    malformed_client = TestClient(app)
+    malformed_client.cookies.set("repolive_anonymous_id", "x" * 500)
+    response = malformed_client.post(
         "/api/v1/analyses",
         json={"repository_url": "https://github.com/openai/openai-python"},
-        cookies={"repolive_anonymous_id": "x" * 500},
     )
     assert response.status_code == 200
     assert response.cookies["repolive_anonymous_id"] != "x" * 500

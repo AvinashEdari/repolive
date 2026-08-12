@@ -24,15 +24,17 @@ item deletes only that ownership link, not the cached public report or another u
 
 ## Retention and deletion
 
-The current MVP retains cached public reports, usage counters, and history links until an operator
-deletes them or a future retention job is configured. Users can remove individual history links in
-the account interface. Supabase account deletion and full subject-data erasure are operational
-requests; operators must delete the user's history links and authenticated usage row, then follow
-Supabase's account-deletion procedure. Database backups may retain deleted rows until backup expiry.
+The operational policy is 90 days for anonymous/authenticated usage counters and unowned cached
+public reports. Reports linked to at least one signed-in history are preserved; after the final link
+is removed, they become eligible at the next cleanup if already older than 90 days. Run
+`python -m app.maintenance --days 90` to preview exact counts and add `--execute` only in an approved
+maintenance window. The command uses one transaction and never removes owned reports.
 
-Before a public production launch, define and automate concrete report, counter, test-account,
-database-backup, and platform-log retention periods. Document the jurisdiction and contact path for
-access or deletion requests.
+Users can remove individual history links in the account interface. Supabase account deletion and
+full subject-data erasure are operational requests; operators must delete the user's history links
+and authenticated usage row, then follow Supabase's account-deletion procedure. Database backups
+may retain deleted rows until backup expiry. Platform logs and database backups should be configured
+for no more than 30 days where provider controls permit it.
 
 ## Analytics boundary
 

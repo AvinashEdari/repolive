@@ -15,6 +15,9 @@ from app.schemas.repository import RepositorySnapshot
 
 _ALL_PLATFORMS: list[Platform] = ["Windows", "Linux", "macOS"]
 _ENV_NAME = re.compile(r"(?m)^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=")
+_SETUP_HEADING = re.compile(r"(?im)^#{1,3}\s+(?:installation|setup|getting started|quickstart)\s*$")
+_NEXT_HEADING = re.compile(r"(?m)^#{1,3}\s+")
+_CODE_FENCE = re.compile(r"```(?:bash|sh|shell|powershell|console)?\s*\n(.*?)```", re.DOTALL)
 
 
 class GuidanceAnalyzer:
@@ -77,7 +80,9 @@ class GuidanceAnalyzer:
         paths = {file.path.lower() for file in snapshot.files}
         for file in snapshot.files:
             name = PurePosixPath(file.path).name.lower()
-            if name == "package.json" and file.text_content:
+            if name.startswith("readme") and file.text_content:
+                steps.extend(self._readme_steps(file.path, file.text_content))
+            elif name == "package.json" and file.text_content:
                 steps.extend(self._node_steps(file.path, file.text_content, paths))
             elif name == "requirements.txt":
                 steps.append(
@@ -120,6 +125,32 @@ class GuidanceAnalyzer:
                 )
             )
         return self._dedupe_steps(steps)
+
+    def _readme_steps(self, path: str, content: str) -> list[SetupStep]:
+        """Extract bounded display-only commands from explicit README setup sections."""
+        steps: list[SetupStep] = []
+        for heading in list(_SETUP_HEADING.finditer(content))[:4]:
+            section_start = heading.end()
+            next_heading = _NEXT_HEADING.search(content, section_start)
+            section = content[section_start : next_heading.start() if next_heading else None]
+            for fence in list(_CODE_FENCE.finditer(section))[:3]:
+                commands = [line.strip() for line in fence.group(1).splitlines()]
+                commands = [
+                    line.removeprefix("$ ")
+                    for line in commands
+                    if line and not line.startswith(("#", ">"))
+                ][:8]
+                for command in commands:
+                    steps.append(
+                        SetupStep(
+                            title="Repository README instruction",
+                            command=command[:500],
+                            origin="repository",
+                            source_path=path,
+                            platforms=_ALL_PLATFORMS,
+                        )
+                    )
+        return steps[:12]
 
     def _node_steps(self, path: str, content: str, paths: set[str]) -> list[SetupStep]:
         try:
@@ -225,6 +256,19 @@ class GuidanceAnalyzer:
         if snapshot.metadata.archived:
             risks.append(
                 InsightFinding(label="GitHub marks this repository as archived.", evidence=[])
+            )
+        node_lockfiles = {
+            PurePosixPath(file.path).name.lower()
+            for file in snapshot.files
+            if PurePosixPath(file.path).name.lower()
+            in {"package-lock.json", "pnpm-lock.yaml", "yarn.lock"}
+        }
+        if len(node_lockfiles) > 1:
+            risks.append(
+                InsightFinding(
+                    label="Multiple Node.js lockfiles may indicate conflicting package managers.",
+                    evidence=sorted(node_lockfiles),
+                )
             )
         if not quality.has_tests or not quality.has_ci:
             risks.append(

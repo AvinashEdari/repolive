@@ -28,7 +28,9 @@ jobs:
         run: curl --fail --silent --show-error --request POST "$RENDER_STAGING_DEPLOY_HOOK"
       - name: Explain unconfigured deployment hook
         if: env.RENDER_STAGING_DEPLOY_HOOK == ''
-        run: echo "Render deploy hook is not configured; verified source is not deployed by this workflow."
+        run: |
+          echo "::error::RENDER_STAGING_DEPLOY_HOOK is required; verified source was not deployed."
+          exit 1
 
   vercel:
     if: >-

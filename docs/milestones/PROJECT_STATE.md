@@ -71,11 +71,13 @@ Last updated: 2026-08-12
   two cached public analyses, one-call official GitHub discovery with transparent multi-signal
   ranking, and an explicit-consent architecture for a future local compatibility client. No local
   machine inspection, billing, sandbox, or repository execution was added.
+- Operational follow-up adds dry-run-first 90-day cleanup for expired counters and unowned reports,
+  bounded README setup-section extraction, and conflicting Node.js lockfile warnings.
 
 ## Planned
 
 - Private repository authorization.
-- Broader lockfile/version-conflict analysis and README setup-section extraction.
+- Version-resolution conflict analysis beyond multiple Node.js lockfile detection.
 
 ## Known constraints
 

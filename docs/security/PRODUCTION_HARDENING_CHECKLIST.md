@@ -29,7 +29,7 @@
 
 ## Data lifecycle
 
-- [ ] Publish concrete retention periods for cached reports, counters, logs, test accounts, and
+- [x] Publish concrete retention periods for cached reports, counters, logs, test accounts, and
       backups; automate deletion where promised.
 - [ ] Test history-link deletion, subject erasure, account deletion, and backup expiry.
 - [ ] Explain that share links are public and ensure public reports contain no account identifier.

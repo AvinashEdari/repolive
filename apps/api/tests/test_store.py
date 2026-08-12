@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,6 +10,8 @@ from app.db.store import (
     AnonymousLimitExceeded,
     AuthenticatedLimitExceeded,
     analyses,
+    anonymous_usage,
+    authenticated_usage,
 )
 from app.schemas.analysis import AnalysisReport, DeterministicAnalysis, QualitySignals
 from app.schemas.repository import RepositoryMetadata, RepositoryReference, RepositorySnapshot
@@ -131,6 +135,30 @@ def test_failed_history_link_rolls_back_the_analysis_transaction(
 def test_database_ping_uses_live_connection() -> None:
     store = AnalysisStore("sqlite:///:memory:")
     store.ping()
+
+
+def test_retention_dry_run_and_cleanup_preserve_owned_reports() -> None:
+    store = AnalysisStore("sqlite:///:memory:")
+    unowned = store.save(empty_report(), "old-browser", 5)
+    owned = store.save(empty_report(commit_sha="commit-owned"), "browser", 5, "user-a")
+    cutoff = datetime.now(UTC) - timedelta(days=30)
+    old = cutoff - timedelta(days=1)
+    with store.engine.begin() as connection:
+        connection.execute(analyses.update().values(created_at=old))
+        connection.execute(anonymous_usage.update().values(updated_at=old))
+        connection.execute(authenticated_usage.update().values(updated_at=old))
+
+    assert store.retention_candidates(cutoff) == {
+        "anonymous_usage": 1,
+        "authenticated_usage": 1,
+        "unowned_analyses": 1,
+    }
+    assert store.get(str(unowned.public_id)) is not None
+
+    removed = store.apply_retention(cutoff)
+    assert removed["unowned_analyses"] == 1
+    assert store.get(str(unowned.public_id)) is None
+    assert store.get(str(owned.public_id)) is not None
 
 
 def test_postgres_engine_uses_bounded_healthy_pool(monkeypatch: pytest.MonkeyPatch) -> None:

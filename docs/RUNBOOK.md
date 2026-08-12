@@ -22,6 +22,14 @@ retention, encryption, and restore owner. Test restores only into an isolated pr
 run Alembic to `head`, verify readiness, compare expected row counts without exposing report data,
 then smoke-test ownership and sharing before routing traffic.
 
+## Retention maintenance
+
+From the backend service directory, preview the 90-day policy with
+`python -m app.maintenance --days 90`. Record the reported counts, take or confirm a current backup,
+then run `python -m app.maintenance --days 90 --execute` during an approved maintenance window.
+Verify readiness and a known owned report afterward. The command deletes expired usage counters and
+only cached reports without any current user-history owner.
+
 ## Rollback
 
 For frontend regressions, promote the last verified Vercel deployment. For API regressions, deploy

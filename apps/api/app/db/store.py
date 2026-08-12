@@ -14,13 +14,14 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     create_engine,
+    func,
 )
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.sql import select, text
+from sqlalchemy.sql import delete, exists, select, text
 
 from app.core.config import get_settings
 from app.schemas.analysis import AnalysisReport
@@ -291,6 +292,49 @@ class AnalysisStore:
                 connection.execute(text("SELECT 1"))
         except SQLAlchemyError as exc:
             raise AnalysisPersistenceError("Database readiness check failed.") from exc
+
+    def retention_candidates(self, before: datetime) -> dict[str, int]:
+        """Count records eligible for retention cleanup without changing the database."""
+        with self.engine.connect() as connection:
+            return self._retention_counts(connection, before)
+
+    def apply_retention(self, before: datetime) -> dict[str, int]:
+        """Delete expired counters and unowned cached reports in one transaction."""
+        try:
+            with self.engine.begin() as connection:
+                counts = self._retention_counts(connection, before)
+                connection.execute(
+                    delete(anonymous_usage).where(anonymous_usage.c.updated_at < before)
+                )
+                connection.execute(
+                    delete(authenticated_usage).where(authenticated_usage.c.updated_at < before)
+                )
+                owned = exists().where(analysis_user_links.c.public_id == analyses.c.public_id)
+                connection.execute(delete(analyses).where(analyses.c.created_at < before, ~owned))
+                return counts
+        except SQLAlchemyError as exc:
+            raise AnalysisPersistenceError("Retention cleanup failed.") from exc
+
+    @staticmethod
+    def _retention_counts(connection: Connection, before: datetime) -> dict[str, int]:
+        owned = exists().where(analysis_user_links.c.public_id == analyses.c.public_id)
+        return {
+            "anonymous_usage": connection.execute(
+                select(func.count())
+                .select_from(anonymous_usage)
+                .where(anonymous_usage.c.updated_at < before)
+            ).scalar_one(),
+            "authenticated_usage": connection.execute(
+                select(func.count())
+                .select_from(authenticated_usage)
+                .where(authenticated_usage.c.updated_at < before)
+            ).scalar_one(),
+            "unowned_analyses": connection.execute(
+                select(func.count())
+                .select_from(analyses)
+                .where(analyses.c.created_at < before, ~owned)
+            ).scalar_one(),
+        }
 
     @staticmethod
     def _identity(report: AnalysisReport) -> dict[str, str]:
