@@ -21,3 +21,9 @@ optional external reporting without making request handling depend on it.
 
 GitHub Actions separates backend and frontend verification. Staging deployment is triggered only
 after successful verification on `main`; production remains an explicitly approved environment.
+
+Stage 7 product tools remain deterministic. Error diagnosis consumes bounded text plus an existing
+report and never echoes or executes the input. Comparison reads two cached public reports. Discovery
+uses one bounded official GitHub repository-search request and returns a transparent multi-signal
+score where popularity is capped. The future local-system protocol is design-only and requires an
+explicit user-run client and consent preview; the website performs no machine inspection.

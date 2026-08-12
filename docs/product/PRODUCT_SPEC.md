@@ -9,3 +9,16 @@ Deterministic evidence is authoritative. Repository-provided commands are labele
 RepoLive-derived guidance and are displayed only. Optional explanations are supplemental and the
 product remains fully functional while their provider is disabled. Anonymous analysis uses a
 configurable allowance and unchanged commit/version reports are reused.
+
+## Product tools
+
+- Error diagnosis accepts at most 20,000 characters, classifies supported error signatures, and
+  combines them with an existing report's evidence. It does not execute or persist the supplied
+  text, and every response includes confidence, safe checks, and unknowns.
+- Comparison accepts two distinct public analysis IDs and compares the cached deterministic
+  reports. It does not make new provider requests or claim measured installation difficulty.
+- Discovery accepts bounded topic, language, and project-type filters, makes one official GitHub
+  search request, and returns at most ten safe normalized links. Its score explains relevance,
+  topic, license, activity state, fork state, and a capped star contribution.
+- Local system detection remains a protocol design only. The website cannot inspect a visitor's
+  machine; a future client would require explicit execution and reviewable consent.

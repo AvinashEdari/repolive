@@ -40,3 +40,11 @@ RepoLive currently has no application analytics SDK. If analytics or error monit
 not capture authorization headers, cookies, access tokens, repository evidence content, passwords,
 database URLs, or complete request bodies. Prefer aggregate operational metrics and short-lived,
 pseudonymous identifiers. Update this document before enabling a new data recipient.
+
+## Product-tool inputs
+
+Pasted error text is processed in memory for the request and is neither persisted nor included in
+application logs or responses. Comparison stores no new data. Discovery sends the explicit search
+filters to GitHub and returns normalized public metadata; RepoLive does not persist search history.
+The proposed local-system protocol prohibits hostnames, usernames, IP addresses, hardware serials,
+environment-variable values, file listings, installed-package inventories, and process listings.

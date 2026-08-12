@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-11
+Last updated: 2026-08-12
 
 ## Implemented and verified
 
@@ -46,7 +46,7 @@ Last updated: 2026-08-11
 - The Render Blueprint now declares the full production pool, authentication, request, evidence,
   and quota configuration. Deployment documentation defines exact Supabase, Render, and Vercel
   variable boundaries and staging smoke-test requirements.
-- Verification: 78 backend tests, 6 frontend interaction tests, migration upgrade/downgrade,
+- Verification: 106 backend tests, 9 frontend interaction tests, migration upgrade/downgrade,
   Python lint and strict typing, frontend lint and typing, and the Next.js production build.
 - Live `pypa/sampleproject` smoke test verified commit SHA retrieval, bounded analysis, setup
   guidance, cache reuse, and exclusion of raw evidence content.
@@ -67,6 +67,10 @@ Last updated: 2026-08-11
   request/analysis observability, canonical and social metadata, robots and sitemap routes, public
   analysis metadata, draft Privacy/Terms/Security/Acceptable Use/Contact pages, and testing,
   troubleshooting, backup/restore, rollback, and incident runbooks.
+- Stage 7 adds bounded deterministic pasted-error diagnosis with repository context, comparison of
+  two cached public analyses, one-call official GitHub discovery with transparent multi-signal
+  ranking, and an explicit-consent architecture for a future local compatibility client. No local
+  machine inspection, billing, sandbox, or repository execution was added.
 
 ## Planned
 
