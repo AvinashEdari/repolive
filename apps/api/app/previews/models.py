@@ -69,6 +69,8 @@ class PreviewLimits(BaseModel):
     build_timeout_seconds: int
     runtime_seconds: int
     log_bytes: int
+    repository_files: int = 10_000
+    repository_bytes: int = 100 * 1024 * 1024
 
 
 class PreviewPolicyResult(BaseModel):

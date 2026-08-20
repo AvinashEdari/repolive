@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -20,8 +21,17 @@ def preview_store(store: Annotated[AnalysisStore, Depends(get_analysis_store)]) 
 def capabilities(settings: Annotated[Settings, Depends(get_settings)]) -> dict[str, object]:
     return {
         "available": settings.preview_execution_enabled,
-        "profiles": ["static_html_v1"],
+        "profiles": [
+            "static_html_v1",
+            "node_vite_v1",
+            "node_vite_tsc_v1",
+            "node_vite_tsc_noemit_v1",
+            "node_cra_v1",
+            "python_flask_app_v1",
+        ],
         "authentication_required": True,
+        "local_auth_bypass": settings.app_env == "development"
+        and settings.preview_local_auth_bypass,
         "arbitrary_commands": False,
         "runtime_provider": settings.preview_runtime_provider
         if settings.preview_execution_enabled
@@ -83,7 +93,7 @@ def create_preview(
         result.preview_id,
         PreviewStatus.QUEUED,
         "Preview queued for an isolated worker.",
-        queued_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+        queued_at=datetime.now(UTC),
     )
     return previews.get(result.preview_id, user.user_id)
 
@@ -122,7 +132,14 @@ def stop_preview(
         current = previews.get(preview_id, user.user_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Preview not found.") from exc
-    if current.status in {PreviewStatus.CANCELED, PreviewStatus.DESTROYED, PreviewStatus.EXPIRED}:
+    if current.status in {
+        PreviewStatus.CANCELED,
+        PreviewStatus.DESTROYED,
+        PreviewStatus.EXPIRED,
+        PreviewStatus.REJECTED,
+        PreviewStatus.FAILED,
+        PreviewStatus.TIMED_OUT,
+    }:
         return Response(status_code=202)
     target = (
         PreviewStatus.STOPPING if current.status == PreviewStatus.READY else PreviewStatus.CANCELED
@@ -146,8 +163,6 @@ def retry_preview(
         current = previews.get(preview_id, user.user_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Preview not found.") from exc
-    if not current.retryable or not previews.transition(
-        preview_id, PreviewStatus.QUEUED, "Preview retry queued."
-    ):
+    if not current.retryable or not previews.retry(preview_id):
         raise HTTPException(status_code=409, detail="Preview is not retryable.")
     return previews.get(preview_id, user.user_id)

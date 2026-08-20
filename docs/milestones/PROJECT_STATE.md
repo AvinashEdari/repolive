@@ -2,11 +2,13 @@
 
 ## Isolated previews: local proof of concept
 
-Static HTML policy, runtime/queue contracts, database lifecycle, authenticated ownership, quotas,
-status/events/stop/retry APIs, dedicated Docker worker, sanitized events and reconciliation dry run
-are implemented behind an off-by-default flag. Node builds, arbitrary commands and Dockerfiles are
-unsupported. Production remains blocked on hardened isolation, egress policy, durable queueing,
-isolated-domain routing, automatic expiration and security validation.
+Static HTML and approved locked npm frontend policies, runtime/queue contracts, database lifecycle, authenticated ownership, quotas,
+status/events/stop/retry APIs, dedicated Docker worker, opaque localhost router, stop/expiry cleanup,
+sanitized events and exact-label reconciliation are implemented behind an off-by-default flag. A
+pinned public commit has passed the complete local queue-to-destruction integration test. Node
+builds, arbitrary commands and Dockerfiles are unsupported. Production remains blocked on hardened
+isolation, controlled build egress, durable queueing, registrable-domain routing and external
+security validation.
 
 Last updated: 2026-08-12
 

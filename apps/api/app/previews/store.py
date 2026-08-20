@@ -1,6 +1,7 @@
 import json
 import secrets
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import (
     Column,
@@ -47,6 +48,7 @@ preview_jobs = Table(
     Column("failure_category", String(64)),
     Column("safe_failure_message", Text),
     Column("sandbox_provider_id", String(128)),
+    Column("application_endpoint", String(128)),
     Column("routing_key", String(64), unique=True),
     Column("build_attempt", Integer, nullable=False, default=0),
     Column("resource_policy_version", String(32), nullable=False),
@@ -95,8 +97,13 @@ class PreviewQuotaExceeded(RuntimeError):
 
 
 class PreviewStore:
-    def __init__(self, store: AnalysisStore) -> None:
+    def __init__(self, store: AnalysisStore, router_base_url: str | None = None) -> None:
         self.store = store
+        if router_base_url is None:
+            from app.core.config import get_settings
+
+            router_base_url = get_settings().preview_router_base_url
+        self.router_base_url = router_base_url
 
     def create(
         self,
@@ -155,11 +162,15 @@ class PreviewStore:
                 .mappings()
                 .one_or_none()
             )
-            count = (
-                0
-                if usage is None or usage["period_start"] < period
-                else int(usage["preview_count"])
-            )
+            usage_period_start = None
+            if usage is not None:
+                usage_period_start = usage["period_start"]
+                if usage_period_start.tzinfo is None:
+                    usage_period_start = usage_period_start.replace(tzinfo=UTC)
+            if usage is None or usage_period_start is None or usage_period_start < period:
+                count = 0
+            else:
+                count = int(usage["preview_count"])
             if count >= period_limit:
                 raise PreviewQuotaExceeded("Preview allowance exhausted.")
             if usage is None:
@@ -173,7 +184,7 @@ class PreviewStore:
                         updated_at=now,
                     )
                 )
-            elif usage["period_start"] < period:
+            elif usage_period_start is not None and usage_period_start < period:
                 connection.execute(
                     preview_usage.update()
                     .where(preview_usage.c.user_id == user_id)
@@ -186,7 +197,8 @@ class PreviewStore:
                     .values(preview_count=preview_usage.c.preview_count + 1, updated_at=now)
                 )
             preview_id = secrets.token_urlsafe(12)
-            routing_key = secrets.token_urlsafe(24)
+            # DNS hostnames are case-insensitive, so routing identifiers must be lowercase-only.
+            routing_key = secrets.token_hex(24)
             connection.execute(
                 preview_jobs.insert().values(
                     preview_id=preview_id,
@@ -242,7 +254,7 @@ class PreviewStore:
             )
         if row is None:
             raise KeyError(preview_id)
-        return self._view(row)
+        return self._view(row, self.router_base_url)
 
     def events(self, preview_id: str, user_id: str) -> list[PreviewEvent]:
         self.get(preview_id, user_id)
@@ -303,9 +315,123 @@ class PreviewStore:
                     lease_owner=worker_id,
                     lease_expires_at=now + timedelta(seconds=lease_seconds),
                     heartbeat_at=now,
+                    build_attempt=preview_jobs.c.build_attempt + 1,
                 )
             )
             return dict(row) if result.rowcount else None
+
+    def retry(self, preview_id: str) -> bool:
+        now = datetime.now(UTC)
+        with self.store.engine.begin() as connection:
+            result = connection.execute(
+                preview_jobs.update()
+                .where(
+                    preview_jobs.c.preview_id == preview_id,
+                    preview_jobs.c.status.in_(
+                        [PreviewStatus.FAILED.value, PreviewStatus.TIMED_OUT.value]
+                    ),
+                    preview_jobs.c.build_attempt < 2,
+                )
+                .values(
+                    status=PreviewStatus.QUEUED.value,
+                    queued_at=now,
+                    lease_owner=None,
+                    lease_expires_at=None,
+                    failure_category=None,
+                    safe_failure_message=None,
+                    destroyed_at=None,
+                    updated_at=now,
+                )
+            )
+            if not result.rowcount:
+                return False
+            self._event(connection, preview_id, "queued", "Preview retry queued.", {})
+        return True
+
+    def route(self, routing_key: str) -> str | None:
+        with self.store.engine.connect() as connection:
+            endpoint = connection.execute(
+                select(preview_jobs.c.application_endpoint).where(
+                    preview_jobs.c.routing_key == routing_key,
+                    preview_jobs.c.status == PreviewStatus.READY.value,
+                    preview_jobs.c.expires_at > datetime.now(UTC),
+                )
+            ).scalar_one_or_none()
+        return str(endpoint) if endpoint else None
+
+    def assign_sandbox(self, preview_id: str, worker_id: str, sandbox_id: str) -> bool:
+        now = datetime.now(UTC)
+        with self.store.engine.begin() as connection:
+            result = connection.execute(
+                preview_jobs.update()
+                .where(
+                    preview_jobs.c.preview_id == preview_id,
+                    preview_jobs.c.status == PreviewStatus.CLONING.value,
+                    preview_jobs.c.lease_owner == worker_id,
+                )
+                .values(sandbox_provider_id=sandbox_id, heartbeat_at=now, updated_at=now)
+            )
+        return bool(result.rowcount)
+
+    def maintenance_candidates(self) -> list[dict[str, object]]:
+        now = datetime.now(UTC)
+        with self.store.engine.connect() as connection:
+            rows = (
+                connection.execute(
+                    select(preview_jobs).where(
+                        (preview_jobs.c.status == PreviewStatus.STOPPING.value)
+                        | (
+                            (preview_jobs.c.status == PreviewStatus.READY.value)
+                            & (preview_jobs.c.expires_at <= now)
+                        )
+                        | (
+                            preview_jobs.c.status.in_(
+                                [
+                                    PreviewStatus.CLONING.value,
+                                    PreviewStatus.BUILDING.value,
+                                    PreviewStatus.STARTING.value,
+                                ]
+                            )
+                            & (preview_jobs.c.lease_expires_at < now)
+                        )
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return [dict(row) for row in rows]
+
+    def record_destroyed(
+        self, preview_id: str, original_status: PreviewStatus, message: str
+    ) -> bool:
+        now = datetime.now(UTC)
+        final_status = (
+            PreviewStatus.DESTROYED
+            if original_status == PreviewStatus.STOPPING
+            else original_status
+        )
+        with self.store.engine.begin() as connection:
+            result = connection.execute(
+                preview_jobs.update()
+                .where(
+                    preview_jobs.c.preview_id == preview_id,
+                    preview_jobs.c.status == original_status.value,
+                )
+                .values(
+                    status=final_status.value,
+                    destroyed_at=now,
+                    stopped_at=now,
+                    application_endpoint=None,
+                    sandbox_provider_id=None,
+                    lease_owner=None,
+                    lease_expires_at=None,
+                    updated_at=now,
+                )
+            )
+            if not result.rowcount:
+                return False
+            self._event(connection, preview_id, "destroyed", message, {})
+        return True
 
     @staticmethod
     def _event(
@@ -329,14 +455,16 @@ class PreviewStore:
         )
 
     @staticmethod
-    def _view(row: RowMapping) -> PreviewView:
+    def _view(row: RowMapping, router_base_url: str | None) -> PreviewView:
         status = PreviewStatus(row["status"])
         url = None
-        from app.core.config import get_settings
-
-        base = get_settings().preview_router_base_url
+        base = router_base_url
         if status == PreviewStatus.READY and base:
-            url = f"{base.rstrip('/')}/{row['routing_key']}"
+            parsed = urlsplit(base)
+            if parsed.hostname:
+                port = f":{parsed.port}" if parsed.port else ""
+                hostname = f"{row['routing_key']}.{parsed.hostname}{port}"
+                url = urlunsplit((parsed.scheme, hostname, "/", "", ""))
         return PreviewView(
             preview_id=row["preview_id"],
             public_analysis_id=row["public_analysis_id"],

@@ -43,6 +43,7 @@ def upgrade() -> None:
         sa.Column("failure_category", sa.String(64)),
         sa.Column("safe_failure_message", sa.Text),
         sa.Column("sandbox_provider_id", sa.String(128)),
+        sa.Column("application_endpoint", sa.String(128)),
         sa.Column("routing_key", sa.String(64), unique=True),
         sa.Column("build_attempt", sa.Integer, nullable=False, server_default="0"),
         sa.Column("resource_policy_version", sa.String(32), nullable=False),

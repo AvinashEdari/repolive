@@ -2,7 +2,7 @@
 
 RepoLive turns public source repositories into evidence-based reports. Repository analysis never
 executes code. A separate, disabled-by-default local preview proof of concept can serve eligible
-root-level static HTML repositories through a dedicated worker and disposable sandbox.
+root-level static HTML and approved locked npm frontend repositories through a dedicated worker and disposable sandbox.
 
 The product shell is available at `/`; the full analysis workspace is available at `/analyze`.
 Successful analyses receive durable public IDs and render at `/analysis/{public_id}`.
@@ -50,11 +50,13 @@ See [PROJECT_STATE.md](docs/milestones/PROJECT_STATE.md) for exact implementatio
 See [LOCAL_SETUP.md](docs/LOCAL_SETUP.md), [ENVIRONMENT.md](docs/ENVIRONMENT.md), and
 [DEPLOYMENT.md](docs/DEPLOYMENT.md) for operational details.
 
-## Local static-preview proof of concept
+## Local isolated-preview proof of concept
 
 Preview execution is off by default. After reviewing the isolated-preview architecture and threat
-model, a developer may configure the database queue, `local_docker` runtime, and loopback preview
-router, then start `python -m app.previews.worker` separately. The API never starts the worker.
-Docker should be rootless where available. This adapter is not approved for production or hostile
-multi-tenancy.
+model, set `PREVIEW_EXECUTION_ENABLED=true`, `PREVIEW_QUEUE_PROVIDER=database`,
+`PREVIEW_RUNTIME_PROVIDER=local_docker`, and
+`PREVIEW_ROUTER_BASE_URL=http://preview.localhost:8081`. From `apps/api`, start the router with
+`python -m uvicorn app.previews.router:app --host 127.0.0.1 --port 8081` and start the worker
+separately with `python -m app.previews.worker`. The API never starts either process. Docker should
+be rootless where available. This adapter is not approved for production or hostile multi-tenancy.
 # repolive

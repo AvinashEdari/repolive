@@ -5,13 +5,14 @@ import accessibility from "./accessibility.module.css";
 import { getAccessToken } from "../../lib/supabase";
 import { SiteHeader } from "../components/site-header";
 import { ReportView } from "../components/report/report-view";
+import { PreviewPanel } from "../components/report/preview-panel";
 
 type Insight = { label: string; evidence: string[] };
 export type Report = { public_id: string | null; snapshot: { repository: { owner: string; name: string; canonical_url: string }; metadata: { description: string | null; stars: number; forks: number; open_issues: number }; files: { path: string }[] }; analysis: { purpose_summary: string; project_types: string[]; languages: { name: string; share_percent: number; evidence: string[] }[]; technologies: { name: string; evidence: string[] }[]; dependencies: { name: string; version_constraint: string | null; ecosystem: string; source_path: string }[]; runtimes: { runtime: string; version_constraint: string | null; evidence: string[] }[]; important_files: { path: string; role: string }[]; scores: { name: string; value: number; factors: { label: string; evidence: string[] }[] }[]; setup_steps: { title: string; command: string | null; origin: string; source_path: string }[]; prerequisites: { name: string; version_constraint: string | null; evidence: string[] }[]; compatibility: { subject: string; status: string; detail: string; evidence: string[] }[]; strengths: Insight[]; risks: Insight[]; missing_essentials: Insight[]; unknowns: Insight[] } };
 
 export default function AnalyzePage() {
   const [url, setUrl] = useState(""); const [report, setReport] = useState<Report | null>(null);
-  const [message, setMessage] = useState("Public repositories only. Code is never executed."); const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("Public repositories only. Eligible websites can run in a disposable local preview."); const [loading, setLoading] = useState(false);
   async function analyze(event: FormEvent) {
     event.preventDefault(); setLoading(true); setMessage("Retrieving bounded evidence and running deterministic analyzers…");
     try {
@@ -25,7 +26,7 @@ export default function AnalyzePage() {
   }
   return <div className={`${styles.shell} ${accessibility.accessibility}`}><SiteHeader context="Analysis workspace"/><main id="main-content">
     <section className={styles.search}><p>DETERMINISTIC REPOSITORY INTELLIGENCE</p><h1>Analyze a public GitHub repository.</h1><form onSubmit={analyze}><label className={accessibility.srOnly} htmlFor="repository-url">GitHub repository URL</label><input id="repository-url" type="url" required value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://github.com/owner/repository"/><button disabled={loading}>{loading ? "Analyzing…" : "Analyze"}</button></form><small role="status" aria-live="polite">{message}</small></section>
-    {report && <ReportView report={report}/>}</main></div>;
+    {report && <><ReportView report={report}/>{report.public_id&&<PreviewPanel publicId={report.public_id}/>}</>}</main></div>;
 }
 
 export function Results({ report }: { report: Report }) {

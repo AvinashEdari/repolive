@@ -7,9 +7,11 @@ job records) from an execution plane (a separately started worker and disposable
 requests only validate policy and enqueue durable database work. They never clone, build, or run a
 repository. `PreviewRuntime` and `PreviewQueue` contracts keep provider operations out of routes.
 
-The first profile is deliberately narrow: a public GitHub repository whose analyzed immutable tree
-contains a root `index.html`. The trusted runtime serves that checkout with a RepoLive-controlled
-static server. Dockerfiles, package scripts, start commands, submodules, LFS, symlinks, arbitrary
+The initial profiles are deliberately narrow: a public GitHub repository whose analyzed immutable
+tree contains a root `index.html`, or a root-level npm-locked Vite/Create React App frontend with an
+exactly approved build script. The trusted runtime either serves that checkout directly or runs
+`npm ci --ignore-scripts` and a fixed profile build before serving only the generated static output.
+Dockerfiles, unapproved package scripts, start commands, submodules, LFS, symlinks, arbitrary
 ports, secrets, writable persistent volumes, and server-rendered applications are rejected.
 
 ```mermaid
@@ -20,7 +22,7 @@ flowchart LR
   W["Dedicated local worker"] -->|lease and heartbeat| D
   W --> G["GitHub immutable archive"]
   W --> R["PreviewRuntime"]
-  R --> S["Disposable static sandbox"]
+  R --> S["Disposable build/static sandbox"]
   X["Isolated preview origin/router"] -->|opaque route only| S
 ```
 
@@ -35,7 +37,9 @@ queue, registrable-domain isolation, TLS routing, distributed abuse controls, me
 Production configuration rejects `local_docker` and fails closed when required providers or routing
 configuration are absent.
 
-The router contract maps a cryptographically random routing key to one healthy sandbox. Untrusted
+The local router maps a lowercase cryptographically random `*.preview.localhost` hostname to one
+healthy sandbox through a loopback-only relay. Each application sandbox has its own internal Docker
+network with no outbound route. The trusted relay receives no source or credentials and exposes only
+the paired static server. Untrusted
 content must use a registrable domain distinct from RepoLive, without shared cookies or browser
-storage. The local adapter may expose a loopback-only development URL and therefore does not prove
-domain isolation.
+storage. Localhost subdomains prove routing behavior but not production registrable-domain isolation.

@@ -32,6 +32,11 @@ ownership/concurrency and log sanitization. `python -m app.previews.reconcile` i
 resource/network adversarial tests must run only on a dedicated local or staging host, never shared
 production infrastructure.
 
+With an explicitly approved local Docker engine, run
+`$env:RUN_PREVIEW_DOCKER_TESTS='1'; python -m pytest tests/test_preview_docker_integration.py` from
+`apps/api`. It clones a pinned public commit, verifies non-root/read-only/capability/PID/network and
+mount controls, serves through the opaque router, stops it, and verifies destruction.
+
 ## Migrations
 
 Use a disposable database. Upgrade to head, downgrade to base, then upgrade a fresh database to

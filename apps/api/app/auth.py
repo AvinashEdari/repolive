@@ -71,6 +71,9 @@ def get_optional_user(
 ) -> AuthUser | None:
     authorization = request.headers.get("Authorization")
     if not authorization:
+        settings = get_settings()
+        if settings.app_env == "development" and settings.preview_local_auth_bypass:
+            return AuthUser("local-development-user")
         return None
     scheme, separator, token = authorization.partition(" ")
     if separator != " " or scheme.lower() != "bearer" or not token:

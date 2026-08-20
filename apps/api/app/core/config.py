@@ -50,15 +50,19 @@ class Settings(BaseSettings):
     preview_worker_id: str = "local-worker"
     preview_max_concurrent_per_user: int = Field(default=1, ge=1, le=10)
     preview_period_limit: int = Field(default=5, ge=1, le=1000)
-    preview_build_timeout_seconds: int = Field(default=60, ge=10, le=900)
+    preview_build_timeout_seconds: int = Field(default=180, ge=10, le=900)
     preview_runtime_seconds: int = Field(default=600, ge=30, le=3600)
-    preview_memory_mb: int = Field(default=128, ge=64, le=2048)
+    preview_memory_mb: int = Field(default=1024, ge=64, le=2048)
     preview_cpu_count: float = Field(default=0.5, gt=0, le=4)
     preview_pids_limit: int = Field(default=64, ge=16, le=512)
     preview_log_bytes: int = Field(default=65536, ge=4096, le=1048576)
+    preview_response_max_bytes: int = Field(default=2 * 1024 * 1024, ge=1024, le=10 * 1024 * 1024)
+    preview_local_auth_bypass: bool = False
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
+        if self.app_env == "production" and self.preview_local_auth_bypass:
+            raise ValueError("PREVIEW_LOCAL_AUTH_BYPASS is forbidden in production.")
         if self.preview_execution_enabled:
             if (
                 self.preview_runtime_provider == "disabled"

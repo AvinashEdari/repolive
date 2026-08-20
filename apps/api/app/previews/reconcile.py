@@ -2,15 +2,27 @@ import argparse
 import subprocess
 
 
-def candidates() -> list[str]:
-    result = subprocess.run(
-        ["docker", "ps", "-a", "--filter", "label=repolive.preview=true", "--format", "{{.Names}}"],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
-    return [name for name in result.stdout.splitlines() if name.startswith("repolive-preview-")]
+def _names(args: list[str], prefix: str) -> list[str]:
+    result = subprocess.run(args, check=True, capture_output=True, text=True, timeout=10)
+    return sorted(name for name in result.stdout.splitlines() if name.startswith(prefix))
+
+
+def candidates() -> dict[str, list[str]]:
+    label = "label=repolive.preview=true"
+    return {
+        "containers": _names(
+            ["docker", "ps", "-a", "--filter", label, "--format", "{{.Names}}"],
+            "repolive-",
+        ),
+        "volumes": _names(
+            ["docker", "volume", "ls", "--filter", label, "--format", "{{.Name}}"],
+            "repolive-preview-",
+        ),
+        "networks": _names(
+            ["docker", "network", "ls", "--filter", label, "--format", "{{.Name}}"],
+            "repolive-preview-",
+        ),
+    }
 
 
 def main() -> None:
@@ -19,11 +31,15 @@ def main() -> None:
     )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
-    names = candidates()
-    print({"dry_run": not args.execute, "candidates": names})
+    found = candidates()
+    print({"dry_run": not args.execute, "candidates": found})
     if args.execute:
-        for name in names:
+        for name in found["containers"]:
             subprocess.run(["docker", "rm", "-f", name], check=False)
+        for name in found["volumes"]:
+            subprocess.run(["docker", "volume", "rm", name], check=False)
+        for name in found["networks"]:
+            subprocess.run(["docker", "network", "rm", name], check=False)
 
 
 if __name__ == "__main__":
