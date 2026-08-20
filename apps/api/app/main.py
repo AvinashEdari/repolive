@@ -12,6 +12,7 @@ from starlette.responses import Response
 
 from app.api.routes.analyses import router as analyses_router
 from app.api.routes.health import router as health_router
+from app.api.routes.previews import router as previews_router
 from app.api.routes.product import router as product_router
 from app.api.routes.saas import router as saas_router
 from app.core.config import get_settings
@@ -121,4 +122,5 @@ def _safe_route(request: Request) -> str:
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(analyses_router, prefix="/api/v1")
 app.include_router(product_router, prefix="/api/v1")
+app.include_router(previews_router, prefix="/api/v1")
 app.include_router(saas_router, prefix="/api/v1")

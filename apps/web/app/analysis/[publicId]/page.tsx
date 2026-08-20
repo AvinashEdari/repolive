@@ -5,6 +5,7 @@ import { SiteHeader } from "../../components/site-header";
 import { ReportView } from "../../components/report/report-view";
 import styles from "../../analyze/results.module.css";
 import { MachineCheckPanel } from "../../components/report/machine-check-panel";
+import { PreviewPanel } from "../../components/report/preview-panel";
 
 export default async function PublicAnalysisPage({
   params,
@@ -21,5 +22,5 @@ export default async function PublicAnalysisPage({
       <section className={styles.search}><p>ANALYSIS UNAVAILABLE</p><h1>This analysis could not be found.</h1><Link href="/analyze">Analyze a repository</Link></section></main>;
   }
   const report = (await response.json()) as Report;
-  return <div className={styles.shell}><SiteHeader context="Shared analysis"/><main id="main-content"><ReportView report={report}/><MachineCheckPanel publicId={publicId}/></main></div>;
+  return <div className={styles.shell}><SiteHeader context="Shared analysis"/><main id="main-content"><ReportView report={report}/><PreviewPanel publicId={publicId}/><MachineCheckPanel publicId={publicId}/></main></div>;
 }

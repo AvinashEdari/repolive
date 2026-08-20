@@ -1,5 +1,13 @@
 # Project state
 
+## Isolated previews: local proof of concept
+
+Static HTML policy, runtime/queue contracts, database lifecycle, authenticated ownership, quotas,
+status/events/stop/retry APIs, dedicated Docker worker, sanitized events and reconciliation dry run
+are implemented behind an off-by-default flag. Node builds, arbitrary commands and Dockerfiles are
+unsupported. Production remains blocked on hardened isolation, egress policy, durable queueing,
+isolated-domain routing, automatic expiration and security validation.
+
 Last updated: 2026-08-12
 
 ## Implemented and verified

@@ -1,5 +1,13 @@
 # Roadmap
 
+## Isolated preview stages
+
+1. Finish local opaque routing, expiry/reconciliation integration and harmless sandbox tests.
+2. Add approved Node static builds with immutable images and controlled registry egress.
+3. Integrate hardened execution, durable queue and isolated TLS preview routing.
+4. Validate staging isolation, abuse, monitoring, cost, load, backup and incident procedures.
+5. Require separate review before any Dockerfile or server-runtime support.
+
 1. Foundation and validation.
 2. Bounded GitHub ingestion and deterministic analyzers.
 3. Real results UI and explainable scoring. (Implemented)

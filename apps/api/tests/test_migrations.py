@@ -31,6 +31,9 @@ def test_migrations_upgrade_and_downgrade_schema(tmp_path: Path) -> None:
             "organization_analyses",
             "github_installations",
             "operational_metrics",
+            "preview_jobs",
+            "preview_events",
+            "preview_usage",
         }
         analysis_pk = inspector.get_pk_constraint("analyses")
         assert analysis_pk["constrained_columns"] == ["public_id"]

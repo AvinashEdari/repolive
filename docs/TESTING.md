@@ -1,4 +1,4 @@
-# Testing
+﻿# Testing
 
 ## Backend
 
@@ -23,6 +23,14 @@ npm.cmd audit --audit-level=high
 ```
 
 `check` runs ESLint, TypeScript, and Vitest. The production build is a separate mandatory gate.
+
+## Preview verification
+
+`pytest apps/api/tests/test_previews.py` covers policy, trusted profiles, lifecycle transitions,
+ownership/concurrency and log sanitization. `python -m app.previews.reconcile` is a dry run;
+`--execute` removes only exact labeled resources. Worker, queue, router, cleanup and harmless
+resource/network adversarial tests must run only on a dedicated local or staging host, never shared
+production infrastructure.
 
 ## Migrations
 

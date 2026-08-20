@@ -1,5 +1,15 @@
 # Deployment
 
+## Preview execution topology
+
+Live execution remains disabled on the deployed Vercel/Render stack. Staging requires separate
+control plane, durable queue, isolated workers, hardened sandbox provider, isolated registrable
+preview domain with DNS/TLS routing, monitoring and cleanup scheduler. Configure capacity,
+concurrency, provider quotas, cost ceilings, emergency disable, rollback, disaster recovery, leak
+reconciliation, incident response, abuse/takedown and retention first. Production fails closed for
+incomplete preview configuration and rejects `local_docker`; use microVM/gVisor/Kata-class isolation
+with provider-enforced egress and distributed abuse protection.
+
 Stage 8 remains disabled by default. Before enabling it, configure the server-only variables listed
 in `ENVIRONMENT.md`, apply all migrations through Alembic `head`, register the Stripe webhook at
 `/api/v1/billing/webhook`, and restrict GitHub App permissions to Metadata read and Contents read.

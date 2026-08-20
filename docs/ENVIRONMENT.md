@@ -34,6 +34,15 @@ these values may use a `NEXT_PUBLIC_` prefix.
 
 No AI environment variable is required. The explanation provider is disabled by default.
 
+## Isolated preview variables
+
+`PREVIEW_EXECUTION_ENABLED` defaults to `false`. Development adapters are
+`PREVIEW_RUNTIME_PROVIDER=local_docker` and `PREVIEW_QUEUE_PROVIDER=database`.
+`PREVIEW_ROUTER_BASE_URL` is the isolated routing origin. Build/runtime, memory, CPU, PID and log
+limits use the corresponding `PREVIEW_*` variables in `.env.example`; period and concurrency quotas
+are separate from analysis quotas. Production rejects local Docker and incomplete enabled
+configuration. No RepoLive secret enters a sandbox.
+
 Use `.env.production.example` only as a variable-name reference. Replace every example hostname
 and credential through the deployment platform's secret manager; never commit the populated file.
 The API and migration process need `DATABASE_URL`, but the browser must never receive it. The

@@ -25,3 +25,23 @@ Unchecked external gates block a public paid launch even when application code i
 
 Current decision: controlled public-repository staging is approved. Public free production, paid
 production, and private-repository production remain blocked by the unchecked operational gates.
+
+## Isolated preview gate
+
+- [x] Feature defaults off; control/execution separation, exact-SHA static policy, ownership,
+      quotas, lifecycle and sanitized events are implemented.
+- [ ] Hardened provider, durable distributed queue and isolated registrable TLS domain are live.
+- [ ] Provider egress blocks metadata, private, control-plane and cross-preview networks.
+- [ ] Expiry scheduler, monitoring, cost controls, reconciliation and adversarial tests pass.
+
+Until every unchecked item passes, previews are local-development-only.
+
+## Isolated preview gate
+
+- [x] Feature defaults off; control/execution separation, exact-SHA static policy, ownership,
+      quotas, lifecycle and sanitized events are implemented.
+- [ ] Hardened provider, durable distributed queue and isolated registrable TLS domain are live.
+- [ ] Provider egress blocks metadata, private, control-plane and cross-preview networks.
+- [ ] Expiry scheduler, monitoring, cost controls, reconciliation and adversarial tests pass.
+
+Until every unchecked item passes, previews are local-development-only.

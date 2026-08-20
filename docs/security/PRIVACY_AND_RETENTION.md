@@ -1,5 +1,15 @@
 # Privacy and data retention
 
+Preview records retain repository identity, immutable commit, user subject, lifecycle timestamps,
+bounded sanitized events and aggregate usage. They never retain credentials, arbitrary environment
+variables, raw logs or repository contents. Sandbox storage must be destroyed at stop/expiry. A
+production retention scheduler for old preview events and usage is still external and unconfigured.
+
+Preview records retain repository identity, immutable commit, user subject, lifecycle timestamps,
+bounded sanitized events and aggregate usage. They never retain credentials, arbitrary environment
+variables, raw logs or repository contents. Sandbox storage must be destroyed at stop/expiry. A
+production retention scheduler for old preview events and usage is still external and unconfigured.
+
 ## Data stored
 
 RepoLive stores deterministic reports for public repositories: normalized repository identity,

@@ -43,9 +43,32 @@ class Settings(BaseSettings):
     api_key_pepper: str | None = None
     github_app_id: str | None = None
     github_app_private_key: str | None = None
+    preview_execution_enabled: bool = False
+    preview_runtime_provider: Literal["disabled", "local_docker"] = "disabled"
+    preview_queue_provider: Literal["disabled", "database"] = "disabled"
+    preview_router_base_url: str | None = None
+    preview_worker_id: str = "local-worker"
+    preview_max_concurrent_per_user: int = Field(default=1, ge=1, le=10)
+    preview_period_limit: int = Field(default=5, ge=1, le=1000)
+    preview_build_timeout_seconds: int = Field(default=60, ge=10, le=900)
+    preview_runtime_seconds: int = Field(default=600, ge=30, le=3600)
+    preview_memory_mb: int = Field(default=128, ge=64, le=2048)
+    preview_cpu_count: float = Field(default=0.5, gt=0, le=4)
+    preview_pids_limit: int = Field(default=64, ge=16, le=512)
+    preview_log_bytes: int = Field(default=65536, ge=4096, le=1048576)
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
+        if self.preview_execution_enabled:
+            if (
+                self.preview_runtime_provider == "disabled"
+                or self.preview_queue_provider == "disabled"
+            ):
+                raise ValueError("Preview execution requires runtime and queue providers.")
+            if not self.preview_router_base_url:
+                raise ValueError("Preview execution requires PREVIEW_ROUTER_BASE_URL.")
+            if self.app_env == "production" and self.preview_runtime_provider == "local_docker":
+                raise ValueError("The local Docker preview runtime is forbidden in production.")
         if self.app_env != "production":
             return self
         hosts = [host.strip() for host in self.allowed_hosts.split(",")]

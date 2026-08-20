@@ -1,4 +1,4 @@
-# Operations runbook
+﻿# Operations runbook
 
 ## Service map
 
@@ -45,6 +45,14 @@ For suspected credential exposure, restrict access, rotate the credential at its
 the replacement, invalidate affected sessions when applicable, and review sanitized audit logs.
 For abuse, preserve safe aggregate evidence, apply edge controls, and avoid identifying users from
 untrusted forwarding headers. Document timeline, impact, remediation, and follow-up tests.
+
+## Preview emergency and reconciliation
+
+Set `PREVIEW_EXECUTION_ENABLED=false` to stop new jobs. Remove routing before termination, then
+destroy exact sandbox IDs. Run `python -m app.previews.reconcile` in dry-run mode and compare exact
+labeled candidates with active records before `--execute`. Alert on stale leases, expired jobs,
+cleanup failures, backlog, resource growth, suspected mining and routing failures. A compromised
+sandbox triggers provider isolation, global disable and incident response.
 
 ## Billing and entitlement rollback
 
