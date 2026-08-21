@@ -86,6 +86,55 @@ class PreviewPolicy:
                         "Local Docker isolation is development-only.",
                     ],
                 )
+            if (
+                build_script == "next build"
+                and "next" in dependency_names
+                and any(
+                    item.title == "Repository script: start"
+                    and item.source_path == "package.json"
+                    and item.command == "next start"
+                    for item in report.analysis.setup_steps
+                )
+            ):
+                return PreviewPolicyResult(
+                    decision="eligible",
+                    detected_profile="node_next_server_v1",
+                    reasons=[
+                        "A locked Next.js server application with approved scripts was detected."
+                    ],
+                    required_runtime="Node.js 22",
+                    package_manager="npm",
+                    proposed_build_command=["npm ci", "next build"],
+                    expected_output_directory=".next",
+                    expected_application_port=8080,
+                    limits=limits,
+                    warnings=[
+                        "Runtime outbound network access is disabled.",
+                        "Local Docker isolation is development-only.",
+                    ],
+                )
+            express_entry = next(
+                (entry for entry in ("server.js", "app.js", "index.js") if entry in paths), None
+            )
+            if "express" in dependency_names and express_entry:
+                return PreviewPolicyResult(
+                    decision="eligible",
+                    detected_profile=f"node_express_{express_entry.removesuffix('.js')}_v1",
+                    reasons=[
+                        f"A locked Express application with root {express_entry} was detected."
+                    ],
+                    required_runtime="Node.js 22",
+                    package_manager="npm",
+                    proposed_build_command=["npm ci"],
+                    expected_output_directory=".",
+                    expected_application_port=8080,
+                    limits=limits,
+                    warnings=[
+                        "The application must honor the PORT environment variable.",
+                        "Runtime outbound network access is disabled.",
+                        "Local Docker isolation is development-only.",
+                    ],
+                )
         python_dependencies = {
             item.name.casefold()
             for item in report.analysis.dependencies
@@ -112,17 +161,47 @@ class PreviewPolicy:
                     "Local Docker isolation is development-only.",
                 ],
             )
+        python_server_profile: tuple[str, str] | None = None
+        if {"main.py", "requirements.txt"}.issubset(paths) and "fastapi" in python_dependencies:
+            python_server_profile = ("python_fastapi_main_v1", "FastAPI main:app")
+        elif {"manage.py", "requirements.txt"}.issubset(paths) and "django" in python_dependencies:
+            python_server_profile = ("python_django_manage_v1", "Django manage.py")
+        elif {"app.py", "requirements.txt"}.issubset(paths) and "streamlit" in python_dependencies:
+            python_server_profile = ("python_streamlit_app_v1", "Streamlit app.py")
+        if python_server_profile and not dangerous:
+            profile_name, description = python_server_profile
+            return PreviewPolicyResult(
+                decision="eligible",
+                detected_profile=profile_name,
+                reasons=[f"A root {description} application was detected."],
+                required_runtime="Python 3.11",
+                package_manager="pip",
+                proposed_build_command=["python -m pip install -r requirements.txt"],
+                expected_output_directory=".",
+                expected_application_port=8080,
+                limits=limits,
+                warnings=[
+                    "Only the fixed framework entry point is supported.",
+                    "Runtime outbound network access is disabled.",
+                    "Local Docker isolation is development-only.",
+                ],
+            )
         reasons = [
-            "Supported previews require static HTML, a locked Vite/Create React App frontend, or a root Flask app."
+            "Supported previews require static HTML or an approved locked web framework profile."
         ]
-        archives = sorted(path for path in paths if path.casefold().endswith((".zip", ".tar", ".gz")))
+        archives = sorted(
+            path for path in paths if path.casefold().endswith((".zip", ".tar", ".gz"))
+        )
         if archives:
             reasons.insert(
                 0,
-                "Repository source is stored inside an archive, which preview workers do not extract or execute.",
+                "Repository source is stored inside an archive, which preview workers do not "
+                "extract or execute.",
             )
-        if not ({"index.html", "package.json", "app.py"} & paths):
-            reasons.append("No supported browser or server entry point was found at the repository root.")
+        if not ({"index.html", "package.json", "app.py", "main.py", "manage.py"} & paths):
+            reasons.append(
+                "No supported browser or server entry point was found at the repository root."
+            )
         if dangerous:
             reasons.append(
                 "Container manifests are never executed and make this profile ineligible."

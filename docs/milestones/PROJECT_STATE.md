@@ -2,11 +2,15 @@
 
 ## Isolated previews: local proof of concept
 
-Static HTML and approved locked npm frontend policies, runtime/queue contracts, database lifecycle, authenticated ownership, quotas,
+The local worker supports controlled static HTML, Vite, Create React App, Next.js, Express, Flask,
+FastAPI, Django, and Streamlit profiles. Arbitrary repository commands and desktop, mobile, database,
+and multi-service projects remain intentionally unsupported.
+
+Static HTML and approved locked web-framework policies, runtime/queue contracts, database lifecycle, authenticated ownership, quotas,
 status/events/stop/retry APIs, dedicated Docker worker, opaque localhost router, stop/expiry cleanup,
 sanitized events and exact-label reconciliation are implemented behind an off-by-default flag. A
 pinned public commit has passed the complete local queue-to-destruction integration test. Node
-builds, arbitrary commands and Dockerfiles are unsupported. Production remains blocked on hardened
+builds use fixed trusted commands; arbitrary repository commands and Dockerfiles are unsupported. Production remains blocked on hardened
 isolation, controlled build egress, durable queueing, registrable-domain routing and external
 security validation.
 

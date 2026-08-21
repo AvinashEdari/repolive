@@ -1,5 +1,18 @@
 # Local setup
 
+## One-click VS Code startup
+
+Open the repository folder in VS Code, ensure Docker Desktop is running, and press `Ctrl+Shift+B`.
+The default **RepoLive: Start everything** task prepares missing dependencies, migrates the local
+SQLite database, starts the web app, API, preview router and worker, waits for readiness, and opens
+`http://localhost:3000/analyze`. From **Terminal → Run Task**, use **RepoLive: Stop everything** to
+stop only the processes started by this task, or **RepoLive: Service status** to inspect them.
+
+The first run can take several minutes while Python/npm dependencies and preview images download.
+Local authentication bypass is enabled only for this development task and is forbidden in production.
+The task also raises the local-only preview-period allowance while retaining a one-active-preview
+concurrency limit; production entitlement limits are unchanged.
+
 Use Node.js 24+, npm 11+, and Python 3.11+. Create `.venv-local`; workstation-specific verification
 environments are ignored and must not be committed.
 

@@ -8,11 +8,13 @@ requests only validate policy and enqueue durable database work. They never clon
 repository. `PreviewRuntime` and `PreviewQueue` contracts keep provider operations out of routes.
 
 The initial profiles are deliberately narrow: a public GitHub repository whose analyzed immutable
-tree contains a root `index.html`, or a root-level npm-locked Vite/Create React App frontend with an
-exactly approved build script. The trusted runtime either serves that checkout directly or runs
-`npm ci --ignore-scripts` and a fixed profile build before serving only the generated static output.
-Dockerfiles, unapproved package scripts, start commands, submodules, LFS, symlinks, arbitrary
-ports, secrets, writable persistent volumes, and server-rendered applications are rejected.
+tree contains a root `index.html`, a root-level npm-locked Vite/Create React App frontend, an
+approved Next.js or Express server, or an approved requirements-locked Flask, FastAPI, Django, or
+Streamlit application with a fixed root entry point. Node profiles require `package-lock.json`; Python
+profiles require `requirements.txt`. The trusted runtime serves static files or starts only a fixed
+framework entry point; repository-provided commands are never invoked. Dockerfiles, unapproved
+package scripts, submodules, LFS, symlinks, arbitrary ports, secrets, and persistent volumes are
+rejected.
 
 ```mermaid
 flowchart LR

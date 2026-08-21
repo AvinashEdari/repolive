@@ -2,7 +2,8 @@
 
 RepoLive turns public source repositories into evidence-based reports. Repository analysis never
 executes code. A separate, disabled-by-default local preview proof of concept can serve eligible
-root-level static HTML and approved locked npm frontend repositories through a dedicated worker and disposable sandbox.
+root-level static HTML and approved locked web-framework repositories through a dedicated worker
+and disposable sandbox.
 
 The product shell is available at `/`; the full analysis workspace is available at `/analyze`.
 Successful analyses receive durable public IDs and render at `/analysis/{public_id}`.

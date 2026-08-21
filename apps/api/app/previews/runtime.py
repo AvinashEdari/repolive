@@ -47,14 +47,8 @@ class LocalDockerRuntime(PreviewRuntime):
     RELAY_IMAGE = (
         "alpine/socat@sha256:beb4a68d9e4fe6b0f21ea774a0fde6c31f580dde6368939ed70100c5385b015e"
     )
-    NODE_IMAGE = (
-        "node@sha256:"
-        "c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32"
-    )
-    PYTHON_IMAGE = (
-        "python@sha256:"
-        "9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7"
-    )
+    NODE_IMAGE = "node@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32"
+    PYTHON_IMAGE = "python@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7"
 
     @staticmethod
     def _run(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
@@ -106,6 +100,9 @@ class LocalDockerRuntime(PreviewRuntime):
         required_file = {
             "static_html_v1": "index.html",
             "python_flask_app_v1": "app.py",
+            "python_fastapi_main_v1": "main.py",
+            "python_django_manage_v1": "manage.py",
+            "python_streamlit_app_v1": "app.py",
         }.get(job.runtime_profile, "package.json")
         script = (
             "git init /work && git -C /work config core.hooksPath /dev/null && "
@@ -162,7 +159,10 @@ class LocalDockerRuntime(PreviewRuntime):
     def build(self, job: SandboxJob, sandbox_id: str) -> None:
         if job.runtime_profile == "static_html_v1":
             return
-        if job.runtime_profile == "python_flask_app_v1":
+        if job.runtime_profile.startswith("python_"):
+            controlled_extra = (
+                " uvicorn==0.35.0" if job.runtime_profile == "python_fastapi_main_v1" else ""
+            )
             self._run(
                 [
                     "docker",
@@ -196,7 +196,55 @@ class LocalDockerRuntime(PreviewRuntime):
                     "-c",
                     "python -m venv .venv && .venv/bin/python -m pip install "
                     "--disable-pip-version-check --no-cache-dir --timeout 120 --retries 5 "
-                    "-r requirements.txt",
+                    "-r requirements.txt" + controlled_extra,
+                ],
+                timeout=job.limits.build_timeout_seconds,
+            )
+            return
+        if (
+            job.runtime_profile.startswith("node_express_")
+            or job.runtime_profile == "node_next_server_v1"
+        ):
+            trusted_build = (
+                "./node_modules/.bin/next build"
+                if job.runtime_profile == "node_next_server_v1"
+                else "true"
+            )
+            self._run(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--name",
+                    f"repolive-build-{job.preview_id}",
+                    "--label",
+                    "repolive.preview=true",
+                    "--cap-drop=ALL",
+                    "--security-opt=no-new-privileges",
+                    "--read-only",
+                    "--user",
+                    "65532:65532",
+                    "--env",
+                    "HOME=/tmp",
+                    "--env",
+                    "NEXT_TELEMETRY_DISABLED=1",
+                    "--tmpfs",
+                    "/tmp:rw,noexec,nosuid,size=256m",
+                    "--pids-limit",
+                    str(job.limits.pids),
+                    "--memory",
+                    f"{job.limits.memory_mb}m",
+                    "--cpus",
+                    str(job.limits.cpu_count),
+                    "--mount",
+                    f"type=volume,src={sandbox_id},dst=/work",
+                    "--workdir",
+                    "/work",
+                    "--entrypoint",
+                    "sh",
+                    self.NODE_IMAGE,
+                    "-c",
+                    "npm ci --ignore-scripts --no-audit --no-fund && " + trusted_build,
                 ],
                 timeout=job.limits.build_timeout_seconds,
             )
@@ -280,35 +328,86 @@ class LocalDockerRuntime(PreviewRuntime):
                 network,
             ]
         )
+        is_server_profile = (
+            job.runtime_profile.startswith("python_")
+            or job.runtime_profile.startswith("node_express_")
+            or job.runtime_profile == "node_next_server_v1"
+        )
         application_args = [
-                "docker",
-                "run",
-                "-d",
-                "--name",
-                f"repolive-preview-{job.preview_id}",
-                "--label",
-                "repolive.preview=true",
-                "--label",
-                f"repolive.preview_id={job.preview_id}",
-                "--read-only",
-                "--network",
-                network,
-                "--user",
-                "65532:65532" if job.runtime_profile == "python_flask_app_v1" else "101:101",
-                "--cap-drop=ALL",
-                "--security-opt=no-new-privileges",
-                "--pids-limit",
-                str(job.limits.pids),
-                "--memory",
-                f"{job.limits.memory_mb}m",
-                "--cpus",
-                str(job.limits.cpu_count),
-                "--ulimit",
-                "nofile=256:256",
-                "--tmpfs",
-                "/tmp:rw,noexec,nosuid,size=8m",
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            f"repolive-preview-{job.preview_id}",
+            "--label",
+            "repolive.preview=true",
+            "--label",
+            f"repolive.preview_id={job.preview_id}",
+            "--read-only",
+            "--network",
+            network,
+            "--user",
+            "65532:65532" if is_server_profile else "101:101",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges",
+            "--pids-limit",
+            str(job.limits.pids),
+            "--memory",
+            f"{job.limits.memory_mb}m",
+            "--cpus",
+            str(job.limits.cpu_count),
+            "--ulimit",
+            "nofile=256:256",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=8m",
         ]
-        if job.runtime_profile == "python_flask_app_v1":
+        python_commands = {
+            "python_flask_app_v1": [
+                "/work/.venv/bin/python",
+                "-m",
+                "flask",
+                "--app",
+                "app:app",
+                "run",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8080",
+            ],
+            "python_fastapi_main_v1": [
+                "/work/.venv/bin/python",
+                "-m",
+                "uvicorn",
+                "main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8080",
+            ],
+            "python_django_manage_v1": [
+                "/work/.venv/bin/python",
+                "manage.py",
+                "runserver",
+                "0.0.0.0:8080",
+                "--noreload",
+            ],
+            "python_streamlit_app_v1": [
+                "/work/.venv/bin/python",
+                "-m",
+                "streamlit",
+                "run",
+                "app.py",
+                "--server.address=0.0.0.0",
+                "--server.port=8080",
+                "--server.headless=true",
+            ],
+        }
+        node_entry = {
+            "node_express_server_v1": "server.js",
+            "node_express_app_v1": "app.js",
+            "node_express_index_v1": "index.js",
+        }.get(job.runtime_profile)
+        if job.runtime_profile in python_commands:
             application_args.extend(
                 [
                     "--env",
@@ -318,20 +417,37 @@ class LocalDockerRuntime(PreviewRuntime):
                     "--env",
                     "PYTHONDONTWRITEBYTECODE=1",
                     "--mount",
-                    f"type=volume,src={sandbox_id},dst=/work,readonly",
+                    f"type=volume,src={sandbox_id},dst=/work",
                     "--workdir",
                     "/work",
                     self.PYTHON_IMAGE,
-                    "/work/.venv/bin/python",
-                    "-m",
-                    "flask",
-                    "--app",
-                    "app:app",
-                    "run",
-                    "--host",
-                    "0.0.0.0",
-                    "--port",
-                    "8080",
+                    *python_commands[job.runtime_profile],
+                ]
+            )
+        elif node_entry or job.runtime_profile == "node_next_server_v1":
+            node_command = (
+                ["/work/node_modules/.bin/next", "start", "-H", "0.0.0.0", "-p", "8080"]
+                if job.runtime_profile == "node_next_server_v1"
+                else ["node", node_entry or "server.js"]
+            )
+            application_args.extend(
+                [
+                    "--env",
+                    "PORT=8080",
+                    "--env",
+                    "HOST=0.0.0.0",
+                    "--env",
+                    "NODE_ENV=production",
+                    "--env",
+                    "HOME=/tmp",
+                    "--env",
+                    "NEXT_TELEMETRY_DISABLED=1",
+                    "--mount",
+                    f"type=volume,src={sandbox_id},dst=/work",
+                    "--workdir",
+                    "/work",
+                    self.NODE_IMAGE,
+                    *node_command,
                 ]
             )
         else:
@@ -394,18 +510,32 @@ class LocalDockerRuntime(PreviewRuntime):
         )
         if result.stdout.strip() != "true":
             return False
-        if job.runtime_profile != "python_flask_app_v1":
+        server_profile = (
+            job.runtime_profile.startswith("python_")
+            or job.runtime_profile.startswith("node_express_")
+            or job.runtime_profile == "node_next_server_v1"
+        )
+        if not server_profile:
             return True
         for _ in range(30):
-            health = subprocess.run(
+            health_command = (
                 [
-                    "docker",
-                    "exec",
-                    f"repolive-preview-{job.preview_id}",
                     "/work/.venv/bin/python",
                     "-c",
-                    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=2)",
-                ],
+                    "import urllib.error,urllib.request; "
+                    "\ntry: urllib.request.urlopen('http://127.0.0.1:8080/', timeout=2)"
+                    "\nexcept urllib.error.HTTPError as exc: raise SystemExit(exc.code >= 500)",
+                ]
+                if job.runtime_profile.startswith("python_")
+                else [
+                    "node",
+                    "-e",
+                    "fetch('http://127.0.0.1:8080/').then(r=>{if(r.status>=500)"
+                    "process.exit(1)}).catch(()=>process.exit(1))",
+                ]
+            )
+            health = subprocess.run(
+                ["docker", "exec", f"repolive-preview-{job.preview_id}", *health_command],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -451,6 +581,5 @@ class LocalDockerRuntime(PreviewRuntime):
 
     def get_logs(self, sandbox_id: str) -> str:
         preview_id = sandbox_id.removeprefix("repolive-preview-")
-        return self._run(
-            ["docker", "logs", "--tail", "100", f"repolive-preview-{preview_id}"]
-        ).stdout
+        result = self._run(["docker", "logs", "--tail", "100", f"repolive-preview-{preview_id}"])
+        return result.stdout + result.stderr

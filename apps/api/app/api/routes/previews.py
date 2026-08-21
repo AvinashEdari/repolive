@@ -28,6 +28,13 @@ def capabilities(settings: Annotated[Settings, Depends(get_settings)]) -> dict[s
             "node_vite_tsc_noemit_v1",
             "node_cra_v1",
             "python_flask_app_v1",
+            "node_next_server_v1",
+            "node_express_server_v1",
+            "node_express_app_v1",
+            "node_express_index_v1",
+            "python_fastapi_main_v1",
+            "python_django_manage_v1",
+            "python_streamlit_app_v1",
         ],
         "authentication_required": True,
         "local_auth_bypass": settings.app_env == "development"

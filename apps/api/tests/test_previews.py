@@ -62,6 +62,12 @@ def flask_report():
     return AnalysisPipeline().analyze(snapshot)
 
 
+def python_server_report(entry: str, requirement: str):
+    snapshot = report([entry, "requirements.txt"]).snapshot
+    snapshot.files[1].text_content = f"{requirement}\n"
+    return AnalysisPipeline().analyze(snapshot)
+
+
 def test_static_policy_uses_only_trusted_profile() -> None:
     result = PreviewPolicy(Settings()).evaluate(report(["index.html", "styles.css"]))
     assert result.decision == "eligible"
@@ -82,9 +88,7 @@ def test_policy_rejects_container_manifest_and_non_static_project() -> None:
 
 def test_policy_allows_only_locked_approved_node_frontend_builds() -> None:
     vite = PreviewPolicy(Settings()).evaluate(
-        node_report(
-            '{"scripts":{"build":"vite build"},"devDependencies":{"vite":"^7.0.0"}}'
-        )
+        node_report('{"scripts":{"build":"vite build"},"devDependencies":{"vite":"^7.0.0"}}')
     )
     assert vite.decision == "eligible"
     assert vite.detected_profile == "node_vite_v1"
@@ -93,16 +97,26 @@ def test_policy_allows_only_locked_approved_node_frontend_builds() -> None:
         '{"scripts":{"build":"vite build"},"devDependencies":{"vite":"^7.0.0"}}'
     )
     vite_with_root_index.snapshot.files.append(RepositoryFile(path="index.html", size_bytes=10))
-    assert PreviewPolicy(Settings()).evaluate(vite_with_root_index).detected_profile == "node_vite_v1"
+    assert (
+        PreviewPolicy(Settings()).evaluate(vite_with_root_index).detected_profile == "node_vite_v1"
+    )
     vite_typescript = PreviewPolicy(Settings()).evaluate(
         node_report(
-            '{"scripts":{"build":"tsc && vite build"},"devDependencies":{"vite":"7","typescript":"5"}}'
+            '{"scripts":{"build":"tsc && vite build"},'
+            '"devDependencies":{"vite":"7","typescript":"5"}}'
         )
     )
     assert vite_typescript.detected_profile == "node_vite_tsc_v1"
-    assert PreviewPolicy(Settings()).evaluate(
-        node_report('{"scripts":{"build":"vite build && curl bad"},"devDependencies":{"vite":"7"}}')
-    ).decision == "ineligible"
+    assert (
+        PreviewPolicy(Settings())
+        .evaluate(
+            node_report(
+                '{"scripts":{"build":"vite build && curl bad"},"devDependencies":{"vite":"7"}}'
+            )
+        )
+        .decision
+        == "ineligible"
+    )
 
 
 def test_policy_allows_fixed_root_flask_profile() -> None:
@@ -113,12 +127,50 @@ def test_policy_allows_fixed_root_flask_profile() -> None:
     with_dockerfile = flask_report()
     with_dockerfile.snapshot.files.append(RepositoryFile(path="Dockerfile", size_bytes=10))
     assert PreviewPolicy(Settings()).evaluate(with_dockerfile).decision == "ineligible"
-    assert PreviewPolicy(Settings()).evaluate(
+
+
+def test_policy_allows_controlled_web_server_profiles() -> None:
+    next_result = PreviewPolicy(Settings()).evaluate(
         node_report(
-            '{"scripts":{"build":"vite build"},"devDependencies":{"vite":"7"}}',
-            "yarn.lock",
+            '{"scripts":{"build":"next build","start":"next start"},'
+            '"dependencies":{"next":"16.0.0"}}'
         )
-    ).decision == "ineligible"
+    )
+    assert next_result.detected_profile == "node_next_server_v1"
+    express_snapshot = node_report('{"dependencies":{"express":"5.0.0"}}')
+    express_snapshot.snapshot.files.append(RepositoryFile(path="server.js", size_bytes=10))
+    assert PreviewPolicy(Settings()).evaluate(express_snapshot).detected_profile == (
+        "node_express_server_v1"
+    )
+    assert (
+        PreviewPolicy(Settings())
+        .evaluate(python_server_report("main.py", "fastapi>=0.100"))
+        .detected_profile
+        == "python_fastapi_main_v1"
+    )
+    assert (
+        PreviewPolicy(Settings())
+        .evaluate(python_server_report("manage.py", "Django>=5"))
+        .detected_profile
+        == "python_django_manage_v1"
+    )
+    assert (
+        PreviewPolicy(Settings())
+        .evaluate(python_server_report("app.py", "streamlit>=1.40"))
+        .detected_profile
+        == "python_streamlit_app_v1"
+    )
+    assert (
+        PreviewPolicy(Settings())
+        .evaluate(
+            node_report(
+                '{"scripts":{"build":"vite build"},"devDependencies":{"vite":"7"}}',
+                "yarn.lock",
+            )
+        )
+        .decision
+        == "ineligible"
+    )
 
 
 def test_logs_strip_control_sequences_redact_and_truncate() -> None:
@@ -214,6 +266,55 @@ def test_local_runtime_uses_internal_network_and_loopback_publish(monkeypatch) -
         relay_call.index("--publish") : relay_call.index("--publish") + 2
     ]
     assert connect_call[1:3] == ["network", "connect"]
+
+
+def test_local_runtime_uses_fixed_commands_for_server_profiles(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    def run(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        output = "127.0.0.1:49152\n" if args[1:2] == ["port"] else ""
+        return subprocess.CompletedProcess(args, 0, output, "")
+
+    monkeypatch.setattr(LocalDockerRuntime, "_run", staticmethod(run))
+    limits = PreviewPolicy(Settings()).evaluate(report(["index.html"])).limits
+    expected_commands = {
+        "node_express_server_v1": ["node", "server.js"],
+        "node_next_server_v1": [
+            "/work/node_modules/.bin/next",
+            "start",
+            "-H",
+            "0.0.0.0",
+            "-p",
+            "8080",
+        ],
+        "python_fastapi_main_v1": [
+            "/work/.venv/bin/python",
+            "-m",
+            "uvicorn",
+            "main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8080",
+        ],
+    }
+    for profile, command in expected_commands.items():
+        calls.clear()
+        job = SandboxJob(
+            preview_id="server_profile_id",
+            owner="owner",
+            repository="repository",
+            commit_sha="a" * 40,
+            routing_key="opaque-routing-key-value",
+            runtime_profile=profile,
+            limits=limits,
+        )
+        LocalDockerRuntime().start(job, "repolive-preview-server_profile_id")
+        run_call = calls[1]
+        assert run_call[-len(command) :] == command
+        assert "PORT=8080" in run_call
+        assert "--read-only" in run_call
 
 
 def test_router_requires_opaque_preview_host_and_caps_headers(monkeypatch) -> None:

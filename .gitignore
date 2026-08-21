@@ -4,6 +4,7 @@
 .venv-local/
 .venv-fresh/
 .venv-verify/
+.venv-vscode/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
